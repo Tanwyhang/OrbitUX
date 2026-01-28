@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-0: 0 0% 0%;
+  --ink-0: 0 0% 100%;
+  --muted: 0 0% 60%;
+  --pink: 330 81% 60%;
+  --font-doto: 'Doto', sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: var(--font-doto);
+}
+
+body {
+  color: hsl(var(--ink-0));
+  background: hsl(var(--bg-0));
+}
+
+@layer utilities {
+  .text-muted {
+    color: hsl(var(--muted));
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+}
