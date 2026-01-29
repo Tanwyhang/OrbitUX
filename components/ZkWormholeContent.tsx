@@ -33,37 +33,37 @@ export default function ZkWormholeContent() {
   return (
     <div className="px-6 py-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">zkWormhole</h1>
-            <p className="mt-2 text-muted">Private cross-chain transactions</p>
+            <h1 className="text-2xl font-bold tracking-tight">zkWormhole</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <span className="text-sm text-muted">Source Chain:</span>
-            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/30 px-4 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-1.5">
               <div className="h-2 w-2 rounded-full bg-green-500" />
               <span className="text-sm font-medium">{sourceChain}</span>
             </div>
           </div>
         </div>
 
-        <button
-          onClick={addRecipient}
-          className="mb-6 w-full rounded-xl bg-white/10 border border-white/10 px-6 py-3 font-semibold text-white hover:bg-white/20 transition-colors"
-        >
-          + Add Recipient
-        </button>
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={addRecipient}
+            className="rounded-lg bg-white border border-white/10 px-4 py-2 font-semibold text-white hover:bg-white/10 transition-colors"
+          >
+            + Add Recipient
+          </button>
+        </div>
 
-        <div className="space-y-4">
+        <div className="grid gap-3">
           {recipients.map((recipient) => (
-            <div key={recipient.id} className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="space-y-2">
-                  <label className="text-sm text-muted">Destination Chain</label>
+            <div key={recipient.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
                   <select
                     value={recipient.chain}
                     onChange={(e) => updateRecipient(recipient.id, 'chain', e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-[hsl(var(--pink))]"
+                    className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 outline-none focus:border-[hsl(var(--pink))] text-sm"
                   >
                     <option>Ethereum</option>
                     <option>Polygon</option>
@@ -72,17 +72,15 @@ export default function ZkWormholeContent() {
                     <option>Base</option>
                   </select>
 
-                  <label className="text-sm text-muted">Address</label>
                   <input
                     type="text"
                     value={recipient.address}
                     onChange={(e) => updateRecipient(recipient.id, 'address', e.target.value)}
                     placeholder="0x1234...5678"
-                    className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 outline-none focus:border-[hsl(var(--pink))] font-mono text-sm"
+                    className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 outline-none focus:border-[hsl(var(--pink))] font-mono text-sm"
                   />
 
-                  <label className="text-sm text-muted">Amount</label>
-                  <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 px-4 py-3">
+                  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2">
                     <input
                       type="text"
                       value={recipient.amount}
@@ -92,114 +90,37 @@ export default function ZkWormholeContent() {
                     />
                     <span className="text-sm font-medium whitespace-nowrap">USDC</span>
                   </div>
-                </div>
 
-                <button
-                  onClick={() => removeRecipient(recipient.id)}
-                  className="rounded-lg bg-white/10 border border-white/10 p-2 hover:bg-white/20 transition-colors text-white/50 hover:text-red-400"
-                  aria-label="Remove recipient"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                  <button
+                    onClick={() => removeRecipient(recipient.id)}
+                    className="rounded-lg bg-white/10 border border-white/10 p-2 hover:bg-white/10 hover:text-red-400 text-white/50 transition-colors"
+                    aria-label="Remove recipient"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           ))}
+        </div>
 
-          {recipients.length > 0 && (
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-muted">Total Amount</div>
-                  <div className="text-3xl font-bold text-[hsl(var(--pink))]">
-                    {getTotalAmount().toLocaleString()}$ USDC
-                  </div>
-                </div>
-                <button className="w-full rounded-xl bg-white px-6 py-4 font-semibold text-[hsl(var(--pink))] group hover:invert">
-                  Send {recipients.length} Transaction{recipients.length === 1 ? '' : 's'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
-              <h3 className="text-lg font-semibold mb-4">Privacy Features</h3>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="mt-1 h-5 w-5 rounded-full bg-[hsl(var(--pink))]/20 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-[hsl(var(--pink))]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-medium">Zero-Knowledge Proofs</div>
-                    <div className="text-sm text-muted">Verify without revealing transaction details</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className="mt-1 h-5 w-5 rounded-full bg-[hsl(var(--pink))]/20 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-[hsl(var(--pink))]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-medium">Stealth Addresses</div>
-                    <div className="text-sm text-muted">Hide recipient identity</div>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className="mt-1 h-5 w-5 rounded-full bg-[hsl(var(--pink))]/20 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-[hsl(var(--pink))]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-medium">Ring Signatures</div>
-                    <div className="text-sm text-muted">Obfuscate transaction origin</div>
-                  </div>
+        {recipients.length > 0 && (
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-muted">Total Amount</div>
+                <div className="text-2xl font-bold text-[hsl(var(--pink))]">
+                  {getTotalAmount().toLocaleString()}$ USDC
                 </div>
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
-              <h3 className="text-lg font-semibold mb-4">Network Status</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-white" />
-                    <span className="text-sm">Ethereum</span>
-                  </div>
-                  <span className="text-sm text-muted">Active</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-white" />
-                    <span className="text-sm">Polygon</span>
-                  </div>
-                  <span className="text-sm text-muted">Active</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-white" />
-                    <span className="text-sm">Arbitrum</span>
-                  </div>
-                  <span className="text-sm text-muted">Active</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-[hsl(var(--pink))]" />
-                    <span className="text-sm">Optimism</span>
-                  </div>
-                  <span className="text-sm text-muted">Active</span>
-                </div>
-              </div>
+              <button className="rounded-xl bg-white border border-white/10 px-6 py-3 font-semibold text-[hsl(var(--pink))] group hover:invert">
+                Send {recipients.length} Transaction{recipients.length === 1 ? '' : 's'}
+              </button>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
