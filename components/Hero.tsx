@@ -30,7 +30,7 @@ export default function Hero() {
     }
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'NAVIGATE_TO_SWAP') {
+      if (event.data.type === 'NAVIGATE_TO_SWAP' || event.data.type === 'NAVIGATE_TO_MAIN') {
         router.push('/swap')
       }
     }

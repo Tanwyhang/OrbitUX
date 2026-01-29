@@ -1,0 +1,21 @@
+{
+  "name": "railgun-demo",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "unshield": "bun run unshield.ts",
+    "shield": "bun run shield.ts",
+    "transfer": "bun run transfer.ts"
+  },
+  "dependencies": {
+    "@railgun-community/engine": "^9.5.1",
+    "@railgun-community/shared-models": "^8.0.0",
+    "@railgun-community/wallet": "^8.0.0",
+    "ethers": "^6.9.0",
+    "dotenv": "^16.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

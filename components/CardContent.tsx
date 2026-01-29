@@ -1,6 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
+import { motion, Easing } from 'framer-motion'
+
+const speedrampEasing: Easing = [0.16, 1, 0.3, 1]
 
 export default function CardContent() {
   const [flipped, setFlipped] = useState(false)
@@ -69,17 +72,27 @@ export default function CardContent() {
                   <div className="h-full flex items-center justify-center">
                     <img src="/orbit.png" alt="Orbit" width={150} height={150} className="object-contain" />
                   </div>
+                  </div>
                 </div>
-              </div>
+            </div>
             </div>
           </div>
-        </div>
 
-        <button className="group mx-auto block w-[386px] rounded-xl border border-white/10 bg-white px-6 py-4 font-semibold text-[hsl(var(--pink))] hover:invert">
-          Add Funds
-        </button>
+          <motion.button
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ duration: 0.6, delay: 0.2, ease: speedrampEasing }}
+           className="group mx-auto block w-[386px] rounded-xl border border-white/10 bg-white px-6 py-4 font-semibold text-[hsl(var(--pink))] hover:invert"
+         >
+           Add Funds
+         </motion.button>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-2">
+         <motion.div
+           initial={{ opacity: 0, y: 30 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ duration: 0.6, delay: 0.4, ease: speedrampEasing }}
+           className="mt-8 grid gap-8 lg:grid-cols-2"
+         >
           <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
             <h3 className="text-lg font-semibold mb-4">Token Balances</h3>
             <div className="space-y-3">
@@ -179,11 +192,12 @@ export default function CardContent() {
                 <div className="text-right">
                   <div className="text-muted">3 days ago</div>
                 </div>
+                </div>
               </div>
             </div>
-          </div>
+           </motion.div>
         </div>
       </div>
-    </div>
-  )
-}
+     )
+   }
+
