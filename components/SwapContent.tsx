@@ -47,7 +47,7 @@ export default function SwapContent() {
                 </div>
               </div>
 
-              <button className="w-full rounded-xl bg-[hsl(var(--pink))] py-4 font-semibold text-black hover:opacity-90 transition-opacity">
+              <button className="w-full rounded-xl bg-white px-4 py-4 font-semibold text-[hsl(var(--pink))] group hover:invert">
                 Swap
               </button>
             </div>

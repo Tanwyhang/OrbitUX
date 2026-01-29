@@ -75,7 +75,7 @@ export default function CardContent() {
           </div>
         </div>
 
-        <button className="mx-auto block w-[386px] rounded-xl border border-white/10 bg-white/5 px-6 py-4 font-semibold text-white hover:bg-white/10 transition-colors backdrop-blur-xl">
+        <button className="group mx-auto block w-[386px] rounded-xl border border-white/10 bg-white px-6 py-4 font-semibold text-[hsl(var(--pink))] hover:invert">
           Add Funds
         </button>
 
