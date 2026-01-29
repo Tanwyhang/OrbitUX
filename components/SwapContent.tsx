@@ -3,7 +3,7 @@ export default function SwapContent() {
     <div className="px-6 py-8">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Quick Swap</h3>
               <div className="h-2 w-2 rounded-full bg-[hsl(var(--pink))] animate-pulse" />
@@ -53,7 +53,7 @@ export default function SwapContent() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 md:col-span-2">
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6 md:col-span-2">
             <h3 className="text-lg font-semibold mb-4">Recent Swaps</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-4">

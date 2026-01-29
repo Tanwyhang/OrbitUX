@@ -80,7 +80,7 @@ export default function CardContent() {
         </button>
 
         <div className="mt-8 grid gap-8 lg:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
             <h3 className="text-lg font-semibold mb-4">Token Balances</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-4">
@@ -127,7 +127,7 @@ export default function CardContent() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
             <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
