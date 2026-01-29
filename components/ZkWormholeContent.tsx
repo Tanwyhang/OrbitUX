@@ -49,7 +49,7 @@ export default function ZkWormholeContent() {
         <div className="mb-4 flex justify-end">
           <button
             onClick={addRecipient}
-            className="rounded-lg bg-white border border-white/10 px-4 py-2 font-semibold text-white hover:bg-white/10 transition-colors"
+            className="rounded-lg bg-transparent border border-white/10 px-4 py-2 font-semibold text-white hover:bg-white/10 transition-colors backdrop-blur-1xl"
           >
             + Add Recipient
           </button>
