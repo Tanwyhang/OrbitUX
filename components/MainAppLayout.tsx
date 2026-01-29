@@ -17,23 +17,22 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <div className="fixed inset-0 w-full h-full -z-10">
+      <div className="fixed inset-0 w-full h-full -z-10 bg-gray-50">
         <PixelBlast
           variant="square"
           pixelSize={5}
-          color="#ff87b3"
+          color="#f0f0f0"
           patternScale={1}
           patternDensity={1}
           pixelSizeJitter={1.8}
           enableRipples
           rippleSpeed={0.4}
           rippleThickness={0.12}
-          rippleIntensityScale={1.5}
+          rippleIntensityScale={1}
           liquid={false}
           liquidStrength={0.12}
-          liquidRadius={1.2}
-          liquidWobbleSpeed={5}
-          speed={5}
+          liquidRadius={1}
+          pixelSizeJitter={0}
           edgeFade={0.25}
           transparent
         />
