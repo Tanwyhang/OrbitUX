@@ -400,29 +400,79 @@ export default function SwapContent() {
 
               {/* Transaction Progress */}
               {isSwapping && (
-                <div className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-black/20">
-                  <div className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full" />
-                  <span className="text-sm">{progress.message}</span>
+                <div className="space-y-2 p-3 rounded-xl border border-white/10 bg-black/20">
+                  <div className="flex items-center gap-3">
+                    <div className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full" />
+                    <span className="text-sm">{progress.message}</span>
+                  </div>
+                  
+                  {/* Show TX hashes for private swaps */}
+                  {privateMode && progress.inputShieldTxHash && (
+                    <div className="flex items-center justify-between text-xs text-muted pt-1 border-t border-white/5">
+                      <span>Shield TX:</span>
+                      <a
+                        href={getExplorerLink(progress.inputShieldTxHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline hover:text-white"
+                      >
+                        {progress.inputShieldTxHash.slice(0, 10)}...
+                      </a>
+                    </div>
+                  )}
+                  
+                  {privateMode && progress.swapTxHash && (
+                    <div className="flex items-center justify-between text-xs text-muted">
+                      <span>Swap TX:</span>
+                      <a
+                        href={getExplorerLink(progress.swapTxHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline hover:text-white"
+                      >
+                        {progress.swapTxHash.slice(0, 10)}...
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Success Message */}
-              {progress.step === 'complete' && progress.txHash && (
-                <div className="flex items-center justify-between p-3 rounded-xl border border-green-500/20 bg-green-500/10">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-sm text-green-500">Swap complete!</span>
+              {progress.step === 'complete' && (progress.txHash || progress.swapTxHash) && (
+                <div className="space-y-2 p-3 rounded-xl border border-green-500/20 bg-green-500/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-sm text-green-500">
+                        {privateMode ? 'Private swap complete!' : 'Swap complete!'}
+                      </span>
+                    </div>
+                    <a
+                      href={getExplorerLink(progress.swapTxHash || progress.txHash || '')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-green-500 hover:underline"
+                    >
+                      View TX
+                    </a>
                   </div>
-                  <a
-                    href={getExplorerLink(progress.txHash)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-green-500 hover:underline"
-                  >
-                    View TX
-                  </a>
+                  
+                  {/* Show all TX hashes for private swaps */}
+                  {privateMode && progress.inputShieldTxHash && (
+                    <div className="flex items-center justify-between text-xs text-green-400/70 pt-1 border-t border-green-500/20">
+                      <span>Shield TX:</span>
+                      <a
+                        href={getExplorerLink(progress.inputShieldTxHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                      >
+                        {progress.inputShieldTxHash.slice(0, 10)}...
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 

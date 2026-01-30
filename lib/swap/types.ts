@@ -57,6 +57,8 @@ export type SwapStep =
   | 'idle'
   | 'approving'
   | 'shielding'            // RAILGUN: shield tokens
+  | 'waiting_poi'          // RAILGUN: waiting for proof of innocence
+  | 'generating_proof'     // RAILGUN: generating ZK proof
   | 'swapping'
   | 'unshielding'          // RAILGUN: unshield result
   | 'complete'
@@ -68,6 +70,9 @@ export interface SwapProgress {
   message: string;
   txHash?: `0x${string}`;
   error?: Error;
+  // Private swap specific
+  inputShieldTxHash?: string;
+  swapTxHash?: string;
 }
 
 // Slippage preset values

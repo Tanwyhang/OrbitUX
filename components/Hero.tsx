@@ -1,62 +1,85 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import PixelBlast from './PixelBlast'
+import PointCloudGlobe from './PointCloudGlobe'
+import { motion } from 'framer-motion'
 
 export default function Hero() {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [dimensions, setDimensions] = useState({ width: 1680, height: 1080 })
   const router = useRouter()
 
-  useEffect(() => {
-    const handleResize = () => {
-      const viewportWidth = window.innerWidth
-      const viewportHeight = window.innerHeight
-      
-      const targetWidth = 1680
-      const targetHeight = 1080
-      
-      const widthScale = Math.min(viewportWidth / targetWidth, 1)
-      
-      const scaledWidth = Math.floor(viewportWidth)
-      const scaledHeight = Math.floor(targetHeight * widthScale)
-      
-      setDimensions({ width: scaledWidth, height: scaledHeight })
-
-      if (iframeRef.current) {
-        iframeRef.current.width = scaledWidth.toString()
-        iframeRef.current.height = scaledHeight.toString()
-      }
-    }
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'NAVIGATE_TO_SWAP' || event.data.type === 'NAVIGATE_TO_MAIN') {
-        router.push('/swap')
-      }
-    }
-
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    window.addEventListener('message', handleMessage)
-    
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      window.removeEventListener('message', handleMessage)
-    }
-  }, [router])
+  const handleLaunchApp = () => {
+    router.push('/swap')
+  }
 
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black flex items-center justify-center">
-      <iframe
-        ref={iframeRef}
-        src="/index.html"
-        width={dimensions.width}
-        height={dimensions.height}
-        style={{ maxWidth: '100vw', maxHeight: '100vh' }}
-        className="border-0"
-        scrolling="no"
-        title="OrbitUX Framer Site"
-      />
+    <div className="cursor-none">
+      {/* PixelBlast Background */}
+      <div className="fixed inset-0 w-full h-full bg-black" style={{ opacity: 0.55 }}>
+        <PixelBlast
+          variant="square"
+          pixelSize={4}
+          color="#ffffff"
+          patternScale={2}
+          patternDensity={0.25}
+          pixelSizeJitter={0}
+          enableRipples={true}
+          rippleIntensityScale={1}
+          rippleThickness={0.12}
+          rippleSpeed={0.4}
+          speed={7}
+          edgeFade={0.25}
+          liquid={false}
+        />
+      </div>
+
+      {/* Hero Content */}
+      <div className="fixed inset-0 z-10 flex flex-col items-center justify-center h-full px-8">
+        <div className="flex flex-col items-center gap-10">
+          {/* Description */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="text-4xl md:text-5xl text-white/90 text-center"
+            style={{ fontFamily: 'var(--font-doto), sans-serif' }}
+          >
+            Orbit zkWormhole
+          </motion.p>
+
+          {/* Point Cloud Globe */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.1, ease: 'easeOut' }}
+            className="relative z-20"
+          >
+            <PointCloudGlobe />
+            {/* Pixelated glow effect */}
+            <div 
+              className="absolute inset-0 blur-3xl opacity-20"
+              style={{
+                background: 'radial-gradient(ellipse at center, #ffffff 0%, transparent 70%)',
+              }}
+            />
+          </motion.div>
+
+          {/* Launch Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
+          >
+            <button
+              onClick={handleLaunchApp}
+              className="group relative px-10 py-5 rounded-full bg-white text-black font-semibold text-lg transition-all duration-300 hover:scale-105 hover:shadow-[0_0_50px_rgba(177,158,239,0.5)] cursor-none"
+              style={{ fontFamily: 'var(--font-doto), sans-serif' }}
+            >
+              Launch Orbit
+            </button>
+          </motion.div>
+        </div>
+      </div>
     </div>
   )
 }

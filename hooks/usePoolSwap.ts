@@ -9,6 +9,8 @@ import {
   getTokenAllowance,
 } from '@/lib/swap';
 import { EXPLORER_URL } from '@/lib/wagmi';
+import { usePrivateSwap } from './usePrivateSwap';
+import type { PrivateSwapStep } from '@/lib/swap/privateSwapTypes';
 
 // BigInt constants
 const ZERO = BigInt(0);
@@ -25,16 +27,48 @@ const STEP_MESSAGES: Record<SwapStep, string> = {
   idle: 'Ready to swap',
   approving: 'Approving token...',
   shielding: 'Shielding tokens via RAILGUN...',
+  waiting_poi: 'Verifying privacy...',
+  generating_proof: 'Generating ZK proof...',
   swapping: 'Executing swap...',
   unshielding: 'Unshielding tokens...',
   complete: 'Swap complete!',
   error: 'Swap failed',
 };
 
+/**
+ * Map private swap step to regular swap step for UI consistency
+ */
+function mapPrivateStepToSwapStep(privateStep: PrivateSwapStep): SwapStep {
+  const mapping: Record<PrivateSwapStep, SwapStep> = {
+    preparing: 'approving',
+    approving: 'approving',
+    shielding_input: 'shielding',
+    waiting_poi_input: 'waiting_poi',
+    generating_proof_input: 'generating_proof',
+    unshielding_to_relayer: 'swapping',
+    executing_swap: 'swapping',
+    shielding_output: 'shielding',
+    waiting_poi_output: 'waiting_poi',
+    generating_proof_output: 'generating_proof',
+    unshielding_output: 'unshielding',
+    complete: 'complete',
+    error: 'error',
+  };
+  return mapping[privateStep] || 'swapping';
+}
+
 export function usePoolSwap(): UsePoolSwapResult {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+  
+  // Private swap hook
+  const { 
+    executePrivateSwap, 
+    progress: privateProgress, 
+    isSwapping: isPrivateSwapping,
+    reset: resetPrivate,
+  } = usePrivateSwap();
 
   const [progress, setProgress] = useState<SwapProgress>({
     step: 'idle',
@@ -57,7 +91,8 @@ export function usePoolSwap(): UsePoolSwapResult {
       message: STEP_MESSAGES.idle,
     });
     setIsSwapping(false);
-  }, []);
+    resetPrivate();
+  }, [resetPrivate]);
 
   const executeSwap = useCallback(async (
     quote: SwapQuote,
@@ -70,17 +105,46 @@ export function usePoolSwap(): UsePoolSwapResult {
       };
     }
 
+    // Use private swap flow when privateMode is enabled
+    if (privateMode) {
+      console.log('[usePoolSwap] Executing private swap via RAILGUN...');
+      
+      const result = await executePrivateSwap(quote);
+      
+      if (result.success) {
+        // Update progress to complete with swap tx hash
+        setProgress({
+          step: 'complete',
+          message: 'Private swap complete!',
+          txHash: result.swapTxHash as `0x${string}` | undefined,
+          inputShieldTxHash: result.inputShieldTxHash,
+          swapTxHash: result.swapTxHash,
+        });
+        
+        return {
+          success: true,
+          txHash: result.swapTxHash as `0x${string}` | undefined,
+          outputAmount: quote.outputAmount,
+        };
+      } else {
+        const err = new Error(result.error || 'Private swap failed');
+        setProgress({
+          step: 'error',
+          message: result.error || 'Private swap failed',
+          error: err,
+        });
+        
+        return {
+          success: false,
+          error: err,
+        };
+      }
+    }
+
+    // Public swap flow
     setIsSwapping(true);
     
     try {
-      if (privateMode) {
-        // Private swap flow: Shield -> Swap -> Unshield
-        // For now, we'll implement public swap first and add RAILGUN integration later
-        // since it requires significant additional infrastructure
-        console.warn('Private mode not yet fully implemented, falling back to public swap');
-      }
-
-      // Public swap flow
       const { route, inputAmount, minimumReceived } = quote;
       
       // For each pool in the route, execute the swap
@@ -198,12 +262,22 @@ export function usePoolSwap(): UsePoolSwapResult {
     } finally {
       setIsSwapping(false);
     }
-  }, [address, walletClient, publicClient, updateProgress]);
+  }, [address, walletClient, publicClient, updateProgress, executePrivateSwap]);
+
+  // Combine progress: use private progress when available, otherwise use local progress
+  const combinedProgress: SwapProgress = isPrivateSwapping && privateProgress
+    ? {
+        step: mapPrivateStepToSwapStep(privateProgress.step),
+        message: privateProgress.message,
+        inputShieldTxHash: privateProgress.inputShieldTxHash,
+        swapTxHash: privateProgress.swapTxHash,
+      }
+    : progress;
 
   return {
     executeSwap,
-    progress,
-    isSwapping,
+    progress: combinedProgress,
+    isSwapping: isSwapping || isPrivateSwapping,
     reset,
   };
 }
