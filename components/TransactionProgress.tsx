@@ -11,8 +11,10 @@ interface TransactionProgressProps {
 const STEP_ORDER: TransferStep[] = [
   'preparing',
   'signing',
+  'signing_token',
   'approving',
   'shielding',
+  'shielding_token',
   'waiting_poi',
   'generating_proof',
   'unshielding',
@@ -23,8 +25,10 @@ const STEP_LABELS: Record<TransferStep, string> = {
   idle: 'Ready',
   preparing: 'Preparing transfer',
   signing: 'Waiting for signature',
+  signing_token: 'Signing token approval',
   approving: 'Processing approval',
   shielding: 'Shielding tokens',
+  shielding_token: 'Shielding token',
   waiting_poi: 'Verifying POI',
   generating_proof: 'Generating ZK proof',
   transferring: 'Transferring',
@@ -34,11 +38,24 @@ const STEP_LABELS: Record<TransferStep, string> = {
 };
 
 export default function TransactionProgress({ progress, onCancel }: TransactionProgressProps) {
-  const { step, progress: percent, message, details } = progress;
+  const { 
+    step, 
+    progress: percent, 
+    message, 
+    details, 
+    totalRecipients, 
+    recipients,
+    currentTokenIndex,
+    totalTokens,
+    currentToken,
+    shieldResults,
+  } = progress;
 
   const currentStepIndex = STEP_ORDER.indexOf(step);
   const isError = step === 'error';
   const isComplete = step === 'complete';
+  const isBatch = (totalRecipients || 0) > 1;
+  const isMultiToken = (totalTokens || 0) > 1;
 
   const getStepStatus = (stepName: TransferStep): 'pending' | 'active' | 'complete' | 'error' => {
     if (isError) return 'error';
@@ -48,14 +65,31 @@ export default function TransactionProgress({ progress, onCancel }: TransactionP
     return 'pending';
   };
 
-  // Calculate elapsed time for active steps
   const getTimeEstimate = (stepName: TransferStep): string | null => {
     if (stepName === 'generating_proof') return '~30s';
     if (stepName === 'waiting_poi') return '~60s';
-    if (stepName === 'shielding') return '~15s';
+    if (stepName === 'shielding' || stepName === 'shielding_token') return '~15s';
     if (stepName === 'unshielding') return '~15s';
     return null;
   };
+
+  const truncateAddress = (addr: string) => {
+    if (!addr || addr.length < 12) return addr || '';
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
+
+  // Filter steps for display based on transfer type
+  const displaySteps = STEP_ORDER.filter(s => {
+    // Hide signing_token if not multi-token
+    if (s === 'signing_token' && !isMultiToken) return false;
+    // Hide shielding_token if not multi-token
+    if (s === 'shielding_token' && !isMultiToken) return false;
+    // Hide signing if multi-token (we use signing_token instead)
+    if (s === 'signing' && isMultiToken) return false;
+    // Hide shielding if multi-token (we use shielding_token instead)  
+    if (s === 'shielding' && isMultiToken) return false;
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -64,7 +98,7 @@ export default function TransactionProgress({ progress, onCancel }: TransactionP
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-black/90 p-6 backdrop-blur-xl"
       >
-        {/* Header - Current Status */}
+        {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className={`text-lg font-semibold ${
@@ -98,6 +132,79 @@ export default function TransactionProgress({ progress, onCancel }: TransactionP
           </div>
         </div>
 
+        {/* Batch Recipients Summary */}
+        {isBatch && recipients && recipients.length > 0 && (
+          <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+            <div className="text-xs text-white/40 mb-2">
+              BATCH TRANSFER: {totalRecipients} recipients
+            </div>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {recipients.map((r, i) => (
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-white/60">
+                    {truncateAddress(r.address)}
+                  </span>
+                  <span className="text-white/40">
+                    {r.amount} {r.token || 'USDC'}
+                  </span>
+                  <span className={`w-12 text-right ${
+                    r.status === 'complete' ? 'text-green-400' :
+                    r.status === 'processing' ? 'text-white' :
+                    r.status === 'error' ? 'text-red-400' :
+                    'text-white/30'
+                  }`}>
+                    {r.status === 'complete' ? 'done' :
+                     r.status === 'processing' ? '...' :
+                     r.status === 'error' ? 'fail' :
+                     'wait'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Multi-Token Shield Status */}
+        {isMultiToken && shieldResults && shieldResults.length > 0 && (
+          <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+            <div className="text-xs text-white/40 mb-2">
+              TOKENS: {shieldResults.length} shielded
+            </div>
+            <div className="space-y-1">
+              {shieldResults.map((result, i) => (
+                <div key={i} className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-white/60">
+                    {truncateAddress(result.tokenAddress)}
+                  </span>
+                  <span className={`${
+                    result.status === 'confirmed' ? 'text-green-400' :
+                    result.status === 'error' ? 'text-red-400' :
+                    'text-white/30'
+                  }`}>
+                    {result.status === 'confirmed' ? 'shielded' :
+                     result.status === 'error' ? 'failed' :
+                     'pending'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Multi-Token Progress Indicator */}
+        {isMultiToken && totalTokens && currentTokenIndex !== undefined && step.includes('token') && (
+          <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+            <div className="text-xs text-white/40 mb-1">
+              Processing token {currentTokenIndex + 1} of {totalTokens}
+            </div>
+            {currentToken && (
+              <div className="text-xs font-mono text-white/60">
+                {truncateAddress(currentToken)}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Current Step Message */}
         <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
           <div className="text-sm text-white">{message}</div>
@@ -108,10 +215,22 @@ export default function TransactionProgress({ progress, onCancel }: TransactionP
 
         {/* Step List */}
         <div className="space-y-1">
-          {STEP_ORDER.map((stepName) => {
+          {displaySteps.map((stepName) => {
             const status = getStepStatus(stepName);
             const timeEstimate = getTimeEstimate(stepName);
             const isActive = status === 'active';
+            
+            // Update label for batch/multi-token
+            let label = STEP_LABELS[stepName];
+            if (isBatch && stepName === 'unshielding') {
+              label = `Unshielding to ${totalRecipients} recipients`;
+            }
+            if (isMultiToken && stepName === 'signing_token') {
+              label = `Signing ${totalTokens} token approvals`;
+            }
+            if (isMultiToken && stepName === 'shielding_token') {
+              label = `Shielding ${totalTokens} tokens`;
+            }
             
             return (
               <div
@@ -146,15 +265,14 @@ export default function TransactionProgress({ progress, onCancel }: TransactionP
                   status === 'error' ? 'text-red-400' :
                   'text-white/30'
                 }`}>
-                  {STEP_LABELS[stepName]}
+                  {label}
                 </span>
                 
-                {/* Time Estimate for Active Step */}
+                {/* Time Estimate */}
                 {isActive && timeEstimate && (
                   <span className="text-xs text-white/40">{timeEstimate}</span>
                 )}
                 
-                {/* Checkmark for Complete */}
                 {status === 'complete' && (
                   <span className="text-xs text-white/40">done</span>
                 )}

@@ -192,17 +192,22 @@ export function getTokenPosition(
 
 /**
  * Get reserves ordered by input/output token
+ * Uses the actual token addresses from the pool reserves to determine order
  */
 export function getOrderedReserves(
   reserves: PoolReserves,
   inputToken: PoolToken,
-  pool: Pool
+  _pool: Pool
 ): { reserveIn: bigint; reserveOut: bigint } {
-  const position = getTokenPosition(inputToken, pool);
+  // Compare against the actual token0/token1 from the contract (in reserves)
+  const inputAddr = inputToken.address.toLowerCase();
+  const token0Addr = reserves.token0.toLowerCase();
   
-  if (position === 'token0') {
+  if (inputAddr === token0Addr) {
+    // Input is token0, so reserveIn = reserve0, reserveOut = reserve1
     return { reserveIn: reserves.reserve0, reserveOut: reserves.reserve1 };
   } else {
+    // Input is token1, so reserveIn = reserve1, reserveOut = reserve0
     return { reserveIn: reserves.reserve1, reserveOut: reserves.reserve0 };
   }
 }

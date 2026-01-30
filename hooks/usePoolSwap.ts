@@ -2,12 +2,11 @@
 
 import { useState, useCallback } from 'react';
 import { useAccount, useWalletClient, usePublicClient } from 'wagmi';
-import type { SwapQuote, SwapStep, SwapProgress, SwapResult, PoolToken } from '@/lib/swap/types';
+import type { SwapQuote, SwapStep, SwapProgress, SwapResult } from '@/lib/swap/types';
 import { 
   ERC20_ABI, 
   POOL_ABI, 
   getTokenAllowance,
-  getTokenPosition,
 } from '@/lib/swap';
 import { EXPLORER_URL } from '@/lib/wagmi';
 
@@ -122,8 +121,14 @@ export function usePoolSwap(): UsePoolSwapResult {
         // Step 2: Execute swap
         updateProgress('swapping');
 
-        // Determine which token is which in the pool
-        const position = getTokenPosition(fromToken, pool);
+        // Read actual token0 from the pool contract to determine position
+        const token0Address = await publicClient.readContract({
+          address: pool.address,
+          abi: POOL_ABI,
+          functionName: 'token0',
+        }) as `0x${string}`;
+        
+        const isToken0 = fromToken.address.toLowerCase() === token0Address.toLowerCase();
         
         // Calculate min output for this step
         // For intermediate swaps, we use 0 slippage internally
@@ -135,7 +140,7 @@ export function usePoolSwap(): UsePoolSwapResult {
         let amount0OutMin: bigint;
         let amount1OutMin: bigint;
 
-        if (position === 'token0') {
+        if (isToken0) {
           // Swapping token0 for token1
           amount0In = currentAmount;
           amount1In = ZERO;

@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import type { TransferResult } from '@/hooks/usePrivateTransfer';
+import type { TokenShieldResult } from '@/lib/railgun/types';
 import { useState } from 'react';
 import { EXPLORER_URL } from '@/lib/wagmi';
 
@@ -19,7 +20,7 @@ export default function TransactionResult({ result, onClose }: TransactionResult
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const truncateAddress = (addr: string, chars: number = 8) => {
+  const truncateAddress = (addr: string, chars: number = 6) => {
     if (!addr || addr.length <= chars * 2) return addr || '';
     return `${addr.slice(0, chars)}...${addr.slice(-chars)}`;
   };
@@ -29,6 +30,10 @@ export default function TransactionResult({ result, onClose }: TransactionResult
     return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
   };
 
+  const isBatch = result.recipients && result.recipients.length > 1;
+  const isMultiToken = result.shieldResults && result.shieldResults.length > 1;
+  const totalAmount = result.recipients?.reduce((sum, r) => sum + parseFloat(r.amount || '0'), 0) || 0;
+
   if (!result.success) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -37,9 +42,26 @@ export default function TransactionResult({ result, onClose }: TransactionResult
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md mx-4 rounded-2xl border border-red-500/20 bg-black/90 p-6 backdrop-blur-xl"
         >
-          <div className="text-center">
+          <div>
             <h2 className="text-xl font-bold mb-2 text-red-400">Transfer Failed</h2>
-            <p className="text-sm text-white/60 mb-6">{result.error}</p>
+            <p className="text-sm text-white/60 mb-4">{result.error}</p>
+            
+            {/* Show failed recipients if batch */}
+            {result.recipients && result.recipients.length > 0 && (
+              <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+                <div className="text-xs text-white/40 mb-2">RECIPIENTS</div>
+                <div className="space-y-1">
+                  {result.recipients.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="font-mono text-white/60">{truncateAddress(r.address)}</span>
+                      <span className="text-white/40">{r.amount} {r.token || 'USDC'}</span>
+                      <span className="text-red-400">failed</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             <button
               onClick={onClose}
               className="w-full py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/20 transition-colors"
@@ -61,39 +83,118 @@ export default function TransactionResult({ result, onClose }: TransactionResult
       >
         {/* Header */}
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-green-400 mb-1">Transfer Complete</h2>
+          <h2 className="text-xl font-bold text-green-400 mb-1">
+            {isBatch ? `Batch Transfer Complete` : 'Transfer Complete'}
+          </h2>
           <p className="text-sm text-white/50">
-            Private transfer via RAILGUN - zero gas paid
+            {isBatch 
+              ? `${result.recipients?.length} recipients - zero gas paid`
+              : 'Private transfer via RAILGUN - zero gas paid'
+            }
           </p>
         </div>
 
-        {/* Flow Diagram */}
+        {/* Recipients List */}
+        {result.recipients && result.recipients.length > 0 && (
+          <div className="mb-6 p-4 rounded-xl border border-white/10 bg-white/5">
+            <div className="flex items-center justify-between text-xs text-white/40 mb-3">
+              <span>RECIPIENTS</span>
+              {isBatch && <span>Total: {totalAmount.toFixed(2)} USDC</span>}
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {result.recipients.map((r, i) => (
+                <div key={i} className="flex items-center justify-between p-2 rounded bg-white/5">
+                  <div className="flex-1">
+                    <div className="font-mono text-sm text-white/80">
+                      {truncateAddress(r.address)}
+                    </div>
+                    {r.unshieldTxHash && (
+                      <a
+                        href={`${EXPLORER_URL}/tx/${r.unshieldTxHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-white/40 hover:text-white/60"
+                      >
+                        {truncateHash(r.unshieldTxHash)}
+                      </a>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-white/70">
+                      {r.amount} {r.token || 'USDC'}
+                    </div>
+                    <div className={`text-xs ${
+                      r.status === 'complete' ? 'text-green-400' : 
+                      r.status === 'error' ? 'text-red-400' : 
+                      'text-white/40'
+                    }`}>
+                      {r.status === 'complete' ? 'sent' : r.status || 'pending'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Privacy Flow */}
         <div className="mb-6 p-4 rounded-xl border border-white/10 bg-white/5">
           <div className="text-xs text-white/40 mb-3">PRIVACY FLOW</div>
-          <div className="flex items-center gap-2 text-sm font-mono">
-            <span className="text-white/70">{truncateAddress(result.senderInfo.publicAddress, 6)}</span>
-            <span className="text-white/30">--&gt;</span>
+          <div className="text-sm font-mono text-center">
+            <span className="text-white/70">{truncateAddress(result.senderInfo.publicAddress)}</span>
+            <span className="text-white/30"> --&gt; </span>
             <span className="text-white/50">[RAILGUN]</span>
-            <span className="text-white/30">--&gt;</span>
-            <span className="text-white/70">{truncateAddress(result.recipientInfo.publicAddress, 6)}</span>
+            <span className="text-white/30"> --&gt; </span>
+            {isBatch ? (
+              <span className="text-white/70">{result.recipients?.length} addresses</span>
+            ) : (
+              <span className="text-white/70">{truncateAddress(result.recipientInfo.publicAddress)}</span>
+            )}
           </div>
-          <div className="text-xs text-green-400/80 mt-2">
-            No on-chain link between sender and recipient
+          <div className="text-xs text-green-400/80 mt-2 text-center">
+            No on-chain link between sender and recipient{isBatch ? 's' : ''}
           </div>
         </div>
 
         {/* Transactions */}
-        <div className="space-y-3 mb-6">
-          {/* Shield TX */}
-          <div className="p-3 rounded-lg border border-white/10 bg-white/5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-white/60">1. Shield TX</span>
-              <span className="text-xs text-green-400">confirmed</span>
-            </div>
-            <div className="text-xs text-white/40 mb-1">
-              You → RAILGUN Contract
-            </div>
-            {result.shieldTxHash && (
+        <div className="space-y-2 mb-6">
+          {/* Multi-token shield transactions */}
+          {isMultiToken && result.shieldResults ? (
+            <>
+              <div className="text-xs text-white/40 mb-1">SHIELD TRANSACTIONS ({result.shieldResults.length} tokens)</div>
+              {result.shieldResults.map((sr, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-white/10 bg-white/5">
+                  <div>
+                    <div className="text-sm text-white/60">Shield TX #{i + 1}</div>
+                    <div className="text-xs text-white/40 font-mono">
+                      {truncateAddress(sr.tokenAddress)}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`${EXPLORER_URL}/tx/${sr.shieldTxHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-mono text-white/50 hover:text-white/70"
+                    >
+                      {truncateHash(sr.shieldTxHash)}
+                    </a>
+                    <button
+                      onClick={() => handleCopy(sr.shieldTxHash, `shield-${i}`)}
+                      className="text-xs text-white/30 hover:text-white/50"
+                    >
+                      {copied === `shield-${i}` ? 'ok' : 'copy'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : result.shieldTxHash && (
+            <div className="flex items-center justify-between p-3 rounded-lg border border-white/10 bg-white/5">
+              <div>
+                <div className="text-sm text-white/60">Shield TX</div>
+                <div className="text-xs text-white/40">You --&gt; RAILGUN</div>
+              </div>
               <div className="flex items-center gap-2">
                 <a
                   href={`${EXPLORER_URL}/tx/${result.shieldTxHash}`}
@@ -107,22 +208,20 @@ export default function TransactionResult({ result, onClose }: TransactionResult
                   onClick={() => handleCopy(result.shieldTxHash!, 'shield')}
                   className="text-xs text-white/30 hover:text-white/50"
                 >
-                  {copied === 'shield' ? 'copied' : 'copy'}
+                  {copied === 'shield' ? 'ok' : 'copy'}
                 </button>
               </div>
-            )}
-          </div>
-
-          {/* Unshield TX */}
-          <div className="p-3 rounded-lg border border-white/10 bg-white/5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-white/60">2. Unshield TX</span>
-              <span className="text-xs text-green-400">confirmed</span>
             </div>
-            <div className="text-xs text-white/40 mb-1">
-              RAILGUN Contract → Recipient
-            </div>
-            {result.unshieldTxHash && (
+          )}
+          
+          {result.unshieldTxHash && (
+            <div className="flex items-center justify-between p-3 rounded-lg border border-white/10 bg-white/5">
+              <div>
+                <div className="text-sm text-white/60">Unshield TX</div>
+                <div className="text-xs text-white/40">
+                  RAILGUN --&gt; {isBatch ? `${result.recipients?.length} recipients` : 'Recipient'}
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <a
                   href={`${EXPLORER_URL}/tx/${result.unshieldTxHash}`}
@@ -136,30 +235,11 @@ export default function TransactionResult({ result, onClose }: TransactionResult
                   onClick={() => handleCopy(result.unshieldTxHash!, 'unshield')}
                   className="text-xs text-white/30 hover:text-white/50"
                 >
-                  {copied === 'unshield' ? 'copied' : 'copy'}
+                  {copied === 'unshield' ? 'ok' : 'copy'}
                 </button>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Observer View */}
-        <div className="mb-6 p-4 rounded-lg border border-white/10 bg-white/5">
-          <div className="text-xs text-white/40 mb-3">WHAT OBSERVERS SEE</div>
-          <div className="grid grid-cols-2 gap-4 text-xs">
-            <div>
-              <div className="text-white/60 mb-1">Shield TX:</div>
-              <div className="text-white/40">From: {truncateAddress(result.senderInfo.publicAddress, 6)}</div>
-              <div className="text-white/40">To: RAILGUN</div>
-              <div className="text-red-400/70 mt-1">Link to recipient: NONE</div>
             </div>
-            <div>
-              <div className="text-white/60 mb-1">Unshield TX:</div>
-              <div className="text-white/40">From: RAILGUN</div>
-              <div className="text-white/40">To: {truncateAddress(result.recipientInfo.publicAddress, 6)}</div>
-              <div className="text-red-400/70 mt-1">Link to sender: NONE</div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Actions */}

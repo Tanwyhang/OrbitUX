@@ -29,14 +29,14 @@ export const TOKENS: Record<TokenSymbol, PoolToken> = {
   USDT: {
     symbol: 'USDT',
     address: TOKEN_ADDRESSES.USDT,
-    decimals: 6,
+    decimals: 18, // Sepolia test token uses 18 decimals
     name: 'Tether USD',
     color: 'bg-green-500',
   },
   EURC: {
     symbol: 'EURC',
     address: TOKEN_ADDRESSES.EURC,
-    decimals: 6,
+    decimals: 18, // Sepolia test token uses 18 decimals
     name: 'Euro Coin',
     color: 'bg-blue-400',
   },
