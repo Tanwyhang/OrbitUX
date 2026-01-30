@@ -181,6 +181,7 @@ export interface RecipientUnshieldResult {
   tokenAddress: string;
   amount: string;
   status: 'pending' | 'complete' | 'error';
+  unshieldTxHash?: string;
   error?: string;
 }
 
