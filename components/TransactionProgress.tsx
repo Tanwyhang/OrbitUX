@@ -1,7 +1,6 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Loader2, Check, Shield, Zap, Lock, Unlock, AlertCircle } from 'lucide-react';
 import type { TransferStep, TransferProgress as ProgressType } from '@/hooks/usePrivateTransfer';
 
 interface TransactionProgressProps {
@@ -9,54 +8,53 @@ interface TransactionProgressProps {
   onCancel?: () => void;
 }
 
-const STEP_ICONS: Record<TransferStep, React.ReactNode> = {
-  idle: <Shield className="w-5 h-5" />,
-  preparing: <Loader2 className="w-5 h-5" />,
-  approving: <Unlock className="w-5 h-5" />,
-  shielding: <Lock className="w-5 h-5" />,
-  waiting_poi: <Shield className="w-5 h-5" />,
-  generating_proof: <Zap className="w-5 h-5" />,
-  transferring: <Shield className="w-5 h-5" />,
-  unshielding: <Unlock className="w-5 h-5" />,
-  complete: <Check className="w-5 h-5" />,
-  error: <AlertCircle className="w-5 h-5" />,
-};
-
 const STEP_ORDER: TransferStep[] = [
   'preparing',
+  'signing',
   'approving',
   'shielding',
   'waiting_poi',
   'generating_proof',
-  'transferring',
   'unshielding',
   'complete',
 ];
 
 const STEP_LABELS: Record<TransferStep, string> = {
   idle: 'Ready',
-  preparing: 'Preparing',
-  approving: 'Approving',
-  shielding: 'Shielding',
-  waiting_poi: 'POI Verification',
-  generating_proof: 'Generating Proof',
+  preparing: 'Preparing transfer',
+  signing: 'Waiting for signature',
+  approving: 'Processing approval',
+  shielding: 'Shielding tokens',
+  waiting_poi: 'Verifying POI',
+  generating_proof: 'Generating ZK proof',
   transferring: 'Transferring',
-  unshielding: 'Unshielding',
+  unshielding: 'Unshielding to recipient',
   complete: 'Complete',
-  error: 'Error',
+  error: 'Failed',
 };
 
 export default function TransactionProgress({ progress, onCancel }: TransactionProgressProps) {
   const { step, progress: percent, message, details } = progress;
 
   const currentStepIndex = STEP_ORDER.indexOf(step);
+  const isError = step === 'error';
+  const isComplete = step === 'complete';
 
   const getStepStatus = (stepName: TransferStep): 'pending' | 'active' | 'complete' | 'error' => {
-    if (step === 'error') return 'error';
+    if (isError) return 'error';
     const stepIndex = STEP_ORDER.indexOf(stepName);
     if (stepIndex < currentStepIndex) return 'complete';
     if (stepIndex === currentStepIndex) return 'active';
     return 'pending';
+  };
+
+  // Calculate elapsed time for active steps
+  const getTimeEstimate = (stepName: TransferStep): string | null => {
+    if (stepName === 'generating_proof') return '~30s';
+    if (stepName === 'waiting_poi') return '~60s';
+    if (stepName === 'shielding') return '~15s';
+    if (stepName === 'unshielding') return '~15s';
+    return null;
   };
 
   return (
@@ -66,120 +64,117 @@ export default function TransactionProgress({ progress, onCancel }: TransactionP
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-black/90 p-6 backdrop-blur-xl"
       >
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[hsl(var(--pink))]/20 mb-4">
-            {step === 'complete' ? (
-              <Check className="w-8 h-8 text-green-400" />
-            ) : step === 'error' ? (
-              <AlertCircle className="w-8 h-8 text-red-400" />
-            ) : (
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-              >
-                <Loader2 className="w-8 h-8 text-[hsl(var(--pink))]" />
-              </motion.div>
-            )}
-          </div>
-          <h2 className="text-xl font-bold mb-1">{message}</h2>
-          {details && (
-            <p className="text-sm text-white/60 font-mono">{details}</p>
-          )}
-        </div>
-
-        {/* Progress Bar */}
+        {/* Header - Current Status */}
         <div className="mb-6">
-          <div className="flex justify-between text-xs text-white/60 mb-2">
-            <span>Progress</span>
-            <span>{percent}%</span>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className={`text-lg font-semibold ${
+              isError ? 'text-red-400' : 
+              isComplete ? 'text-green-400' : 
+              'text-white'
+            }`}>
+              {isError ? 'Transfer Failed' : isComplete ? 'Transfer Complete' : 'Processing...'}
+            </h2>
+            <span className={`text-sm font-mono ${
+              isError ? 'text-red-400' : 
+              isComplete ? 'text-green-400' : 
+              'text-white/60'
+            }`}>
+              {percent}%
+            </span>
           </div>
-          <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+          
+          {/* Progress Bar */}
+          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
             <motion.div
               className={`h-full rounded-full ${
-                step === 'error' ? 'bg-red-500' : 
-                step === 'complete' ? 'bg-green-500' : 
-                'bg-[hsl(var(--pink))]'
+                isError ? 'bg-red-500' : 
+                isComplete ? 'bg-green-500' : 
+                'bg-white'
               }`}
               initial={{ width: 0 }}
               animate={{ width: `${percent}%` }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
             />
           </div>
         </div>
 
-        {/* Step Indicators */}
-        <div className="space-y-2">
-          {STEP_ORDER.map((stepName, index) => {
+        {/* Current Step Message */}
+        <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+          <div className="text-sm text-white">{message}</div>
+          {details && (
+            <div className="text-xs text-white/50 mt-1 font-mono">{details}</div>
+          )}
+        </div>
+
+        {/* Step List */}
+        <div className="space-y-1">
+          {STEP_ORDER.map((stepName) => {
             const status = getStepStatus(stepName);
+            const timeEstimate = getTimeEstimate(stepName);
+            const isActive = status === 'active';
             
             return (
-              <motion.div
+              <div
                 key={stepName}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className={`flex items-center gap-3 p-2 rounded-lg ${
-                  status === 'active' ? 'bg-[hsl(var(--pink))]/10' :
-                  status === 'complete' ? 'bg-green-500/10' :
-                  status === 'error' ? 'bg-red-500/10' :
-                  'bg-white/5'
+                className={`flex items-center gap-3 px-3 py-2 rounded text-sm ${
+                  isActive ? 'bg-white/10' : ''
                 }`}
               >
-                <div className={`p-1.5 rounded-lg ${
-                  status === 'active' ? 'bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]' :
-                  status === 'complete' ? 'bg-green-500/20 text-green-400' :
-                  status === 'error' ? 'bg-red-500/20 text-red-400' :
-                  'bg-white/10 text-white/40'
-                }`}>
+                {/* Status Indicator */}
+                <div className="w-5 flex justify-center">
                   {status === 'complete' ? (
-                    <Check className="w-4 h-4" />
+                    <span className="text-green-400">+</span>
                   ) : status === 'active' ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                    <motion.span
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                      className="text-white"
                     >
-                      <Loader2 className="w-4 h-4" />
-                    </motion.div>
+                      &gt;
+                    </motion.span>
+                  ) : status === 'error' ? (
+                    <span className="text-red-400">x</span>
                   ) : (
-                    STEP_ICONS[stepName]
+                    <span className="text-white/20">-</span>
                   )}
                 </div>
-                <span className={`text-sm ${
-                  status === 'active' ? 'text-white font-medium' :
-                  status === 'complete' ? 'text-green-400' :
+                
+                {/* Step Label */}
+                <span className={`flex-1 ${
+                  status === 'complete' ? 'text-white/50' :
+                  status === 'active' ? 'text-white' :
                   status === 'error' ? 'text-red-400' :
-                  'text-white/40'
+                  'text-white/30'
                 }`}>
                   {STEP_LABELS[stepName]}
                 </span>
-                {status === 'active' && stepName === 'generating_proof' && (
-                  <span className="ml-auto text-xs text-white/40">~30s</span>
+                
+                {/* Time Estimate for Active Step */}
+                {isActive && timeEstimate && (
+                  <span className="text-xs text-white/40">{timeEstimate}</span>
                 )}
-              </motion.div>
+                
+                {/* Checkmark for Complete */}
+                {status === 'complete' && (
+                  <span className="text-xs text-white/40">done</span>
+                )}
+              </div>
             );
           })}
         </div>
 
-        {/* ZK Proof Explanation */}
-        {step === 'generating_proof' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-3 rounded-lg bg-[hsl(var(--pink))]/10 border border-[hsl(var(--pink))]/20"
-          >
-            <p className="text-xs text-white/80">
-              Generating a Zero-Knowledge proof that proves your transaction is valid 
-              without revealing any details about sender, receiver, or amount.
-            </p>
-          </motion.div>
+        {/* Error Message */}
+        {isError && (
+          <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <div className="text-sm text-red-400">{message}</div>
+          </div>
         )}
 
-        {/* Cancel Button (only show when not complete or error) */}
-        {step !== 'complete' && step !== 'error' && onCancel && (
+        {/* Cancel Button */}
+        {!isComplete && !isError && onCancel && (
           <button
             onClick={onCancel}
-            className="w-full mt-4 py-2 text-sm text-white/60 hover:text-white transition-colors"
+            className="w-full mt-4 py-2 text-sm text-white/40 hover:text-white/60 transition-colors"
           >
             Cancel
           </button>

@@ -41,9 +41,13 @@ export const POOL_ADDRESSES = {
 
 // RAILGUN contract addresses for Sepolia
 export const RAILGUN_CONTRACTS = {
-  PROXY: '0x19b620929f97b7b990801496c3b361ca5def8c71',
+  PROXY: '0xeCFCf3b4eC647c4Ca6D49108b311b7a7C9543fea',
   UNSHIELD: '0x643C5dD371461dcD8661b10b259dc0D938941598',
 } as const;
+
+// Server-side relayer wallet address (pays gas for private transfers)
+// Users approve this address to spend their tokens for private transfers
+export const RELAYER_ADDRESS = '0xbCc5526e6119Ca92a4d6dB0E041744373E6b1af0' as const;
 
 // Etherscan URL for transaction links
 export const EXPLORER_URL = 'https://sepolia.etherscan.io';

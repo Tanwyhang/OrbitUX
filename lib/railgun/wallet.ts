@@ -135,6 +135,20 @@ class RailgunWalletService {
   }
 
   /**
+   * Get cached wallet info by wallet ID.
+   * Returns the wallet info if it was created in this session.
+   */
+  getCachedWalletByID(walletID: string): RailgunWalletInfo | null {
+    // Search through cache for matching wallet ID
+    for (const walletInfo of this.walletCache.values()) {
+      if (walletInfo.walletID === walletID) {
+        return walletInfo;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Derive encryption key from password using PBKDF2.
    */
   async deriveEncryptionKey(password: string): Promise<string> {

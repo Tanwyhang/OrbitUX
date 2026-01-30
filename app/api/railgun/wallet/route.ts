@@ -37,6 +37,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<WalletCre
       success: true,
       walletID: walletInfo.walletID,
       railgunAddress: walletInfo.railgunAddress,
+      encryptionKey: walletInfo.encryptionKey, // Server-derived key for wallet operations
     });
   } catch (error) {
     console.error('[API] Wallet creation failed:', error);

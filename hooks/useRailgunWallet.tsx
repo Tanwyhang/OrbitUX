@@ -87,14 +87,17 @@ export function RailgunWalletProvider({ children }: { children: ReactNode }): Re
         throw new Error(data.error || 'Failed to create wallet');
       }
 
-      // We need to derive the encryption key client-side for later use
-      // (The API returns it but we'll also compute it here for signing)
-      const encryptionKey = await deriveEncryptionKeyClientSide(password);
+      // Use the server-derived encryption key
+      // IMPORTANT: Do not derive client-side - the server uses RAILGUN SDK's pbkdf2
+      // which has different salt encoding than Web Crypto API
+      if (!data.encryptionKey) {
+        throw new Error('Server did not return encryption key');
+      }
 
       const wallet: RailgunWalletInfo = {
         walletID: data.walletID,
         railgunAddress: data.railgunAddress,
-        encryptionKey,
+        encryptionKey: data.encryptionKey,
       };
 
       setState({
@@ -141,43 +144,6 @@ export function RailgunWalletProvider({ children }: { children: ReactNode }): Re
       {children}
     </RailgunWalletContext.Provider>
   );
-}
-
-/**
- * Derive encryption key client-side for use in transfer operations.
- * Must match the server-side derivation.
- */
-async function deriveEncryptionKeyClientSide(password: string): Promise<string> {
-  const passwordBytes = new TextEncoder().encode(password);
-  const passwordArray = Array.from(passwordBytes);
-  const paddedArray = passwordArray
-    .slice(0, 16)
-    .concat(Array(Math.max(0, 16 - passwordArray.length)).fill(0));
-  const saltHex = paddedArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-  
-  // Use Web Crypto API for PBKDF2
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
-
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: new TextEncoder().encode(saltHex),
-      iterations: 100000,
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    256
-  );
-
-  // Convert to hex string
-  const hashArray = Array.from(new Uint8Array(derivedBits));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function useRailgunWallet() {

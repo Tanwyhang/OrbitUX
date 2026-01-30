@@ -23,6 +23,7 @@ export interface WalletCreateResponse {
   success: boolean;
   walletID?: string;
   railgunAddress?: string;
+  encryptionKey?: string; // Server-derived key for wallet operations
   error?: string;
 }
 
@@ -39,6 +40,39 @@ export interface BalanceResponse {
   error?: string;
 }
 
+/**
+ * Gas abstraction method for token approval
+ * - 'eip7702': User signed EIP-7702 authorization, relayer submits Type 4 tx
+ * - 'permit': User signed EIP-2612 permit, relayer calls permit() + transferFrom()
+ * - 'approved': User already has sufficient allowance for relayer
+ */
+export type GasAbstractionMethod = 'eip7702' | 'permit' | 'approved';
+
+/**
+ * EIP-7702 signed authorization data
+ */
+export interface EIP7702Authorization {
+  chainId: number;
+  address: string; // BatchExecutor contract address
+  nonce: number;
+  yParity: number;
+  r: string;
+  s: string;
+}
+
+/**
+ * EIP-2612 permit signature data
+ */
+export interface PermitData {
+  owner: string;
+  spender: string;
+  value: string;
+  deadline: string;
+  v: number;
+  r: string;
+  s: string;
+}
+
 export interface TransferRequest {
   senderWalletID: string;
   senderEncryptionKey: string;
@@ -46,7 +80,12 @@ export interface TransferRequest {
   recipientAddress: string; // Public 0x address - we'll shield/unshield behind the scenes
   tokenAddress: string;
   amount: string; // In base units (e.g., "1000000" for 1 USDC)
-  signerPrivateKey: string; // For self-signing mode
+  userAddress: string; // User's public wallet address
+  
+  // Gas abstraction - one of these should be provided
+  gasAbstraction: GasAbstractionMethod;
+  eip7702Auth?: EIP7702Authorization; // Required if gasAbstraction === 'eip7702'
+  permitData?: PermitData; // Required if gasAbstraction === 'permit'
 }
 
 export type TransferStep = 
