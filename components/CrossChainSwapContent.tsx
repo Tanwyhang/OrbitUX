@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { TokenETH, TokenUSDT, TokenEURC } from '@web3icons/react';
+import { TokenETH, TokenUSDT, TokenEURC, NetworkSepolia, NetworkArbitrumSepolia, NetworkPolygonAmoy } from '@web3icons/react';
 import type { ComponentType, SVGProps } from 'react';
 import type { PoolToken, TokenSymbol } from '@/lib/swap/types';
 import type { ChainId, CrossChainQuote } from '@/lib/swap/crossChainTypes';
@@ -28,6 +28,25 @@ const TOKEN_ICONS: Record<TokenSymbol, Web3IconComponent> = {
   USDT: TokenUSDT,
   EURC: TokenEURC,
 };
+
+// Chain icon mapping
+const CHAIN_ICONS: Record<number, Web3IconComponent> = {
+  [CHAIN_IDS.SEPOLIA]: NetworkSepolia,
+  [CHAIN_IDS.ARBITRUM_SEPOLIA]: NetworkArbitrumSepolia,
+  [CHAIN_IDS.POLYGON_AMOY]: NetworkPolygonAmoy,
+};
+
+// Helper component to render chain icon
+function ChainIcon({
+  chainId,
+  className,
+}: {
+  chainId: ChainId;
+  className?: string;
+}) {
+  const Icon = CHAIN_ICONS[chainId];
+  return Icon ? <Icon variant="branded" className={className} /> : null;
+}
 
 // Token list from cross-chain config
 const TOKEN_LIST = Object.values(CROSS_CHAIN_TOKENS);
@@ -321,12 +340,8 @@ export default function CrossChainSwapContent() {
                     }}
                     className="w-full flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-3 hover:bg-white/5 transition-colors"
                   >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-3 h-3 rounded-full ${
-                          isCrossChain ? 'bg-[hsl(var(--pink))]' : 'bg-green-500'
-                        }`}
-                      />
+                    <div className="flex items-center gap-3">
+                      <ChainIcon chainId={destChainId} className="w-6 h-6" />
                       <span className="font-medium">
                         {CHAIN_NAMES[destChainId] || `Chain ${destChainId}`}
                       </span>
@@ -360,13 +375,7 @@ export default function CrossChainSwapContent() {
                             destChainId === chain.id ? 'bg-white/5' : ''
                           }`}
                         >
-                          <div
-                            className={`w-3 h-3 rounded-full ${
-                              chain.id === CHAIN_IDS.SEPOLIA
-                                ? 'bg-green-500'
-                                : 'bg-[hsl(var(--pink))]'
-                            }`}
-                          />
+                          <ChainIcon chainId={chain.id} className="w-6 h-6" />
                           <span className="font-medium">{chain.name}</span>
                           {destChainId === chain.id && (
                             <svg
