@@ -5,9 +5,25 @@ import { motion, Easing } from 'framer-motion'
 import { TokenETH, TokenUSDC, TokenDAI } from '@web3icons/react'
 
 const speedrampEasing: Easing = [0.16, 1, 0.3, 1]
+import { useZkp2pOnramp } from '@/hooks/useZkp2pOnramp'
 
 export default function CardContent() {
   const [flipped, setFlipped] = useState(false)
+  const { openOnramp, isLoading, error } = useZkp2pOnramp()
+
+  const handleAddFunds = async () => {
+    try {
+      await openOnramp({
+        // Ethereum Mainnet ETH: 1:0x0000000000000000000000000000000000000000
+        toToken: '1:0x0000000000000000000000000000000000000000',
+        // You can optionally specify recipient address
+        // recipientAddress: '0x...',
+      })
+    } catch (err) {
+      // Error is handled by the hook, but we can add additional handling here
+      console.error('Failed to open onramp:', err)
+    }
+  }
 
   return (
     <div className="px-6 py-8">
@@ -87,6 +103,28 @@ export default function CardContent() {
          >
            Add Funds
          </motion.button>
+        <button
+          onClick={handleAddFunds}
+          disabled={isLoading}
+          className="group mx-auto block w-[386px] rounded-xl border border-white/10 bg-white px-6 py-4 font-semibold text-[hsl(var(--pink))] hover:invert disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        >
+          {isLoading ? 'Opening Onramp...' : 'Add Funds'}
+        </button>
+
+        {error && (
+          <div className="mx-auto mt-4 max-w-[386px] rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200 whitespace-pre-line">
+            <div className="font-semibold mb-2">Setup Required:</div>
+            {error}
+            <a
+              href="https://chromewebstore.google.com/detail/peerauth-authenticate-and/ijpgccednehjpeclfcllnjjcmiohdjih"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 block text-center rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition-colors"
+            >
+              Open Chrome Web Store
+            </a>
+          </div>
+        )}
 
          <motion.div
            initial={{ opacity: 0, y: 30 }}

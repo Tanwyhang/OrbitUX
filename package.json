@@ -17,6 +17,7 @@
     "@react-three/fiber": "^9.5.0",
     "@tanstack/react-query": "^5.90.20",
     "@web3icons/react": "^4.1.16",
+    "@zkp2p/sdk": "^0.0.10",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
     "ethers": "^6.16.0",
