@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { motion, Easing } from 'framer-motion'
+import { TokenETH, TokenUSDC, TokenDAI } from '@web3icons/react'
 
 const speedrampEasing: Easing = [0.16, 1, 0.3, 1]
 
@@ -98,7 +99,7 @@ export default function CardContent() {
             <div className="space-y-3">
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-white" />
+                  <TokenETH variant="branded" className="h-10 w-10" />
                   <div>
                     <div className="font-medium">ETH</div>
                     <div className="text-sm text-muted">Ethereum</div>
@@ -112,7 +113,7 @@ export default function CardContent() {
               
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-[hsl(var(--pink))]" />
+                  <TokenUSDC variant="branded" className="h-10 w-10" />
                   <div>
                     <div className="font-medium">USDC</div>
                     <div className="text-sm text-muted">USD Coin</div>
@@ -126,7 +127,7 @@ export default function CardContent() {
 
               <div className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-white" />
+                  <TokenDAI variant="branded" className="h-10 w-10" />
                   <div>
                     <div className="font-medium">DAI</div>
                     <div className="text-sm text-muted">Dai Stablecoin</div>

@@ -3,11 +3,22 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ReactNode } from 'react'
+import { ConnectButton } from '@rainbow-me/rainbowkit'
 import FloatingNav, { NavItem } from './ui/floating-navbar'
 import PixelBlast from './PixelBlast'
+import { Web3Provider } from './providers/Web3Provider'
+import { StealthModeProvider, useStealthMode } from './contexts/StealthModeContext'
 
-export default function MainAppLayout({ children }: { children: ReactNode }) {
+function MainAppLayoutContent({ children }: { children: ReactNode }) {
   const pathname = usePathname()
+  const isZkWormhole = pathname === '/zkWormhole'
+  const { stealthMode } = useStealthMode()
+  
+  // Show PixelBlast at 0.8 opacity on all pages except zkWormhole
+  // On zkWormhole, the opacity is controlled separately by stealth mode
+  const pixelBlastOpacity = isZkWormhole 
+    ? (stealthMode ? 0.85 : 0) 
+    : 0.8
 
   const navItems: NavItem[] = [
     { name: 'Swap', link: '/swap' },
@@ -17,7 +28,10 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <div className="fixed inset-0 w-full h-full -z-10 bg-black opacity-85">
+      <div 
+        className="fixed inset-0 w-full h-full -z-10 bg-black transition-opacity duration-500 ease-in-out"
+        style={{ opacity: pixelBlastOpacity }}
+      >
         <PixelBlast
           variant="square"
           pixelSize={4}
@@ -42,6 +56,18 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
           <h4 className="text-[hsl(var(--black))]">Orbit</h4>
         </div>
       </Link>
+
+      {/* Wallet Connect Button */}
+      <div className="fixed top-4 right-6 z-50">
+        <ConnectButton 
+          showBalance={false}
+          chainStatus="icon"
+          accountStatus={{
+            smallScreen: 'avatar',
+            largeScreen: 'full',
+          }}
+        />
+      </div>
       
       <FloatingNav navItems={navItems} />
       
@@ -49,5 +75,15 @@ export default function MainAppLayout({ children }: { children: ReactNode }) {
         {children}
       </div>
     </>
+  )
+}
+
+export default function MainAppLayout({ children }: { children: ReactNode }) {
+  return (
+    <Web3Provider>
+      <StealthModeProvider>
+        <MainAppLayoutContent>{children}</MainAppLayoutContent>
+      </StealthModeProvider>
+    </Web3Provider>
   )
 }

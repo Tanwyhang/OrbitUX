@@ -4,7 +4,7 @@ export const NETWORK_CONFIG = {
   NETWORK: NetworkName.EthereumSepolia,
   CHAIN_ID: 11155111,
 
-  RPC_URL: "https://sepolia.infura.io/v3/cbaa2a650a114902855799547b9c179f",
+  RPC_URL: "https://eth-sepolia.g.alchemy.com/v2/lO9FWaEPl-y8mMJHInELW",
 
   TOKENS: {
     USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
