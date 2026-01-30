@@ -1,0 +1,90 @@
+{
+  "../../../@crx/manifest": {
+    "file": "assets/crx-manifest.js-B7ZEO3M5.js",
+    "name": "crx-manifest.js",
+    "src": "../../../@crx/manifest",
+    "isEntry": true
+  },
+  "_ethers-BoPGt6r3.js": {
+    "file": "assets/ethers-BoPGt6r3.js",
+    "name": "ethers"
+  },
+  "_inpage.ts-loader-aDW8fVPj.js": {
+    "file": "assets/inpage.ts-loader-aDW8fVPj.js",
+    "src": "_inpage.ts-loader-aDW8fVPj.js"
+  },
+  "_railgun-models-l0sNRNKZ.js": {
+    "file": "assets/railgun-models-l0sNRNKZ.js",
+    "name": "railgun-models"
+  },
+  "_railgun-wallet-CcjkIzuf.js": {
+    "file": "assets/railgun-wallet-CcjkIzuf.js",
+    "name": "railgun-wallet"
+  },
+  "_react-vendor-C9a92cWx.js": {
+    "file": "assets/react-vendor-C9a92cWx.js",
+    "name": "react-vendor",
+    "imports": [
+      "_wagmi-k1CenwYs.js",
+      "_railgun-wallet-CcjkIzuf.js"
+    ]
+  },
+  "_wagmi-k1CenwYs.js": {
+    "file": "assets/wagmi-k1CenwYs.js",
+    "name": "wagmi",
+    "imports": [
+      "_railgun-wallet-CcjkIzuf.js"
+    ]
+  },
+  "extension/background/index.ts": {
+    "file": "assets/index.ts-D_Lf5dWx.js",
+    "name": "index.ts",
+    "src": "extension/background/index.ts",
+    "isEntry": true,
+    "imports": [
+      "_wagmi-k1CenwYs.js",
+      "_ethers-BoPGt6r3.js",
+      "_railgun-wallet-CcjkIzuf.js"
+    ],
+    "dynamicImports": [
+      "extension/background/rpc-handler.ts"
+    ]
+  },
+  "extension/background/rpc-handler.ts": {
+    "file": "assets/rpc-handler-DZpFbA1Q.js",
+    "name": "rpc-handler",
+    "src": "extension/background/rpc-handler.ts",
+    "isDynamicEntry": true
+  },
+  "extension/content/injector.ts": {
+    "file": "assets/injector.ts-DOv5aKkL.js",
+    "name": "injector.ts",
+    "src": "extension/content/injector.ts",
+    "isEntry": true
+  },
+  "extension/content/inpage.ts": {
+    "file": "assets/inpage.ts-B2PP6O8J.js",
+    "name": "inpage.ts",
+    "src": "extension/content/inpage.ts",
+    "isEntry": true
+  },
+  "extension/popup/index.html": {
+    "file": "assets/index.html-Hf5GPH72.js",
+    "name": "index.html",
+    "src": "extension/popup/index.html",
+    "isEntry": true,
+    "imports": [
+      "_wagmi-k1CenwYs.js",
+      "_railgun-wallet-CcjkIzuf.js",
+      "_react-vendor-C9a92cWx.js"
+    ]
+  },
+  "node_modules/@railgun-community/curve25519-scalarmult-wasm/pkg-esm/curve25519_scalarmult_wasm_bg.wasm": {
+    "file": "assets/curve25519_scalarmult_wasm_bg-DFYe4j8J.wasm",
+    "src": "node_modules/@railgun-community/curve25519-scalarmult-wasm/pkg-esm/curve25519_scalarmult_wasm_bg.wasm"
+  },
+  "node_modules/@railgun-community/poseidon-hash-wasm/pkg-esm/poseidon_hash_wasm_bg.wasm": {
+    "file": "assets/poseidon_hash_wasm_bg-Dmi1loUz.wasm",
+    "src": "node_modules/@railgun-community/poseidon-hash-wasm/pkg-esm/poseidon_hash_wasm_bg.wasm"
+  }
+}

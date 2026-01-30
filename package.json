@@ -7,7 +7,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "dev:extension": "vite build --mode development --watch",
+    "build:extension": "vite build",
+    "preview:extension": "vite build && echo 'Load extension-dist in Chrome at chrome://extensions'"
   },
   "dependencies": {
     "@railgun-community/shared-models": "^8.0.0",
@@ -35,17 +38,21 @@
     "wagmi": "^3.4.1"
   },
   "devDependencies": {
+    "@crxjs/vite-plugin": "^2.3.0",
     "@types/leveldown": "^4.0.6",
     "@types/node": "^20.11.30",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@types/snarkjs": "^0.7.9",
+    "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.0",
     "eslint-config-next": "15.1.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.19",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "^7.3.1",
+    "vite-plugin-node-polyfills": "^0.25.0"
   },
   "engines": {
     "node": ">=18.18.0"

@@ -14,8 +14,10 @@ export default function CardContent() {
   const handleAddFunds = async () => {
     try {
       await openOnramp({
-        // Ethereum Mainnet ETH: 1:0x0000000000000000000000000000000000000000
-        toToken: '1:0x0000000000000000000000000000000000000000',
+        // Polygon: 137:0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359
+        toToken: '137:0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+        paymentPlatform: 'wise',
+        inputAmount: 10,
         // You can optionally specify recipient address
         // recipientAddress: '0x...',
       })
@@ -95,14 +97,6 @@ export default function CardContent() {
             </div>
           </div>
 
-          <motion.button
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ duration: 0.6, delay: 0.2, ease: speedrampEasing }}
-           className="group mx-auto block w-[386px] rounded-xl border border-white/10 bg-white px-6 py-4 font-semibold text-[hsl(var(--pink))] hover:invert"
-         >
-           Add Funds
-         </motion.button>
         <button
           onClick={handleAddFunds}
           disabled={isLoading}

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orbit Wallet Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; }
+    h2 { color: #666; font-size: 18px; margin-top: 24px; }
+    button {
+      background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .status {
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    .status.connected { background: #d4edda; color: #155724; }
+    .status.disconnected { background: #f8d7da; color: #721c24; }
+    .status.info { background: #d1ecf1; color: #0c5460; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🚀 Orbit Wallet Test Page</h1>
+    <p>Test your Orbit Wallet Chrome extension with these tools:</p>
+
+    <div id="status" class="status disconnected">Wallet Status: Not Connected</div>
+
+    <h2>Connection</h2>
+    <button onclick="connectWallet()">Connect Wallet</button>
+    <button onclick="getAccounts()">Get Accounts</button>
+    <button onclick="getChainId()">Get Chain ID</button>
+
+    <h2>Transactions</h2>
+    <button onclick="sendTransaction()">Send Transaction</button>
+    <button onclick="signMessage()">Sign Message</button>
+
+    <h2>Orbit-Specific</h2>
+    <button onclick="getPrivateBalance()">Get Private Balance</button>
+    <button onclick="privateTransfer()">Private Transfer</button>
+
+    <h2>Console Output</h2>
+    <pre id="output">// Results will appear here</pre>
+  </div>
+
+  <script>
+    const output = document.getElementById('output');
+    const status = document.getElementById('status');
+
+    function log(...args) {
+      const text = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ');
+      output.textContent = text + '\n' + output.textContent;
+      console.log(...args);
+    }
+
+    function updateStatus(connected, message) {
+      status.className = 'status ' + (connected ? 'connected' : 'disconnected');
+      status.textContent = message;
+    }
+
+    // Check if wallet is available
+    if (typeof window.ethereum !== 'undefined') {
+      if (window.ethereum.isOrbit) {
+        log('✅ Orbit Wallet detected!');
+        updateStatus(false, 'Wallet Status: Orbit Wallet detected, not connected');
+      } else {
+        log('⚠️ Another wallet detected:', window.ethereum);
+        updateStatus(false, 'Wallet Status: Another wallet detected');
+      }
+
+      // Listen for account changes
+      window.ethereum.on('accountsChanged', (accounts) => {
+        log('📋 Accounts changed:', accounts);
+        updateStatus(accounts.length > 0, `Connected: ${accounts[0]}`);
+      });
+
+      // Listen for chain changes
+      window.ethereum.on('chainChanged', (chainId) => {
+        log('🔗 Chain changed:', chainId);
+      });
+    } else {
+      log('❌ No wallet detected. Please install the Orbit Wallet extension.');
+      updateStatus(false, 'Wallet Status: No wallet detected');
+    }
+
+    async function connectWallet() {
+      try {
+        log('Requesting account connection...');
+        const accounts = await window.ethereum.request({
+          method: 'eth_requestAccounts'
+        });
+        log('✅ Connected:', accounts);
+        updateStatus(true, `Connected: ${accounts[0]}`);
+      } catch (error) {
+        log('❌ Connection failed:', error.message);
+        if (error.code === 4001) {
+          log('User rejected the connection');
+        }
+      }
+    }
+
+    async function getAccounts() {
+      try {
+        const accounts = await window.ethereum.request({
+          method: 'eth_accounts'
+        });
+        log('📋 Accounts:', accounts);
+      } catch (error) {
+        log('❌ Error:', error.message);
+      }
+    }
+
+    async function getChainId() {
+      try {
+        const chainId = await window.ethereum.request({
+          method: 'eth_chainId'
+        });
+        log('🔗 Chain ID:', chainId, `(${parseInt(chainId, 16)})`);
+      } catch (error) {
+        log('❌ Error:', error.message);
+      }
+    }
+
+    async function sendTransaction() {
+      try {
+        const accounts = await window.ethereum.request({
+          method: 'eth_accounts'
+        });
+
+        if (!accounts.length) {
+          log('❌ Please connect your wallet first');
+          return;
+        }
+
+        const tx = {
+          from: accounts[0],
+          to: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb', // Example address
+          value: '0x0',
+        };
+
+        log('Sending transaction:', tx);
+        const txHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [tx],
+        });
+        log('✅ Transaction sent:', txHash);
+      } catch (error) {
+        log('❌ Error:', error.message);
+        if (error.code === 4001) {
+          log('User rejected the transaction');
+        }
+      }
+    }
+
+    async function signMessage() {
+      try {
+        const accounts = await window.ethereum.request({
+          method: 'eth_accounts'
+        });
+
+        if (!accounts.length) {
+          log('❌ Please connect your wallet first');
+          return;
+        }
+
+        const message = 'Hello, Orbit Wallet!';
+        log('Signing message:', message);
+
+        const signature = await window.ethereum.request({
+          method: 'personal_sign',
+          params: [message, accounts[0]],
+        });
+        log('✅ Signature:', signature);
+      } catch (error) {
+        log('❌ Error:', error.message);
+        if (error.code === 4001) {
+          log('User rejected the signature');
+        }
+      }
+    }
+
+    async function getPrivateBalance() {
+      try {
+        const accounts = await window.ethereum.request({
+          method: 'eth_accounts'
+        });
+
+        if (!accounts.length) {
+          log('❌ Please connect your wallet first');
+          return;
+        }
+
+        log('Getting private balance for:', accounts[0]);
+        const balance = await window.ethereum.request({
+          method: 'orbit_getPrivateBalance',
+          params: [accounts[0]],
+        });
+        log('✅ Private balance:', balance);
+      } catch (error) {
+        log('❌ Error:', error.message);
+      }
+    }
+
+    async function privateTransfer() {
+      try {
+        log('⚠️ Private transfer not yet implemented');
+        log('This feature will be available in the next version');
+      } catch (error) {
+        log('❌ Error:', error.message);
+      }
+    }
+  </script>
+</body>
+</html>
