@@ -37,7 +37,7 @@
     ]
   },
   "extension/background/index.ts": {
-    "file": "assets/index.ts-D_Lf5dWx.js",
+    "file": "assets/index.ts-CZ17aNA-.js",
     "name": "index.ts",
     "src": "extension/background/index.ts",
     "isEntry": true,
@@ -69,7 +69,7 @@
     "isEntry": true
   },
   "extension/popup/index.html": {
-    "file": "assets/index.html-Hf5GPH72.js",
+    "file": "assets/index.html-BoM36X-i.js",
     "name": "index.html",
     "src": "extension/popup/index.html",
     "isEntry": true,

@@ -139,6 +139,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleRPCRequest(message, sender, sendResponse)
       return true
 
+    case 'GET_SWAP_QUOTE':
+      handleGetSwapQuote(message.data, sendResponse)
+      return true
+
+    case 'EXECUTE_SWAP':
+      handleExecuteSwap(message.data, sendResponse)
+      return true
+
     default:
       sendResponse({ error: 'Unknown message type' })
   }
@@ -421,6 +429,83 @@ async function handleRPCRequest(message: any, sender: chrome.runtime.MessageSend
 
   const response = await handler.handleRequest(request, origin)
   sendResponse(response)
+}
+
+async function handleGetSwapQuote(data: any, sendResponse: (response: any) => void) {
+  try {
+    const { fromToken, toToken, amount, destChain, slippage } = data
+
+    // For now, return a simulated quote
+    // In production, you would call the actual cross-chain pool contract
+    const isSameChain = destChain === 'sepolia'
+    const isSameToken = fromToken === toToken
+
+    let type = 'swap'
+    if (!isSameChain && isSameToken) {
+      type = 'transfer'
+    } else if (!isSameChain && !isSameToken) {
+      type = 'cross_chain_swap'
+    }
+
+    // Simulate quote calculation
+    const amountIn = parseFloat(amount)
+    let amountOut = amountIn * 0.99 // 1% fee
+    const feeBps = 100 // 1%
+
+    // Apply slippage
+    const minAmountOut = (amountOut * (1 - slippage / 100)).toFixed(6)
+
+    sendResponse({
+      success: true,
+      quote: {
+        type,
+        amountIn,
+        amountOut: amountOut.toFixed(6),
+        minAmountOut,
+        feeBps,
+        priceImpact: isSameToken ? 0 : 0.5,
+      },
+    })
+  } catch (error: any) {
+    sendResponse({ success: false, error: error.message })
+  }
+}
+
+async function handleExecuteSwap(data: any, sendResponse: (response: any) => void) {
+  try {
+    if (!inMemoryWallet) {
+      sendResponse({ success: false, error: 'Wallet is locked' })
+      return
+    }
+
+    const { fromToken, toToken, amount, destChain, quote } = data
+
+    // Get the first account
+    const fromAddress = inMemoryWallet.addresses[0]
+    const privateKey = inMemoryWallet.privateKeys[fromAddress]
+
+    if (!privateKey) {
+      sendResponse({ success: false, error: 'Private key not found' })
+      return
+    }
+
+    // For now, simulate the swap execution
+    // In production, you would:
+    // 1. Approve the pool contract to spend tokens
+    // 2. Execute the swap/transfer/cross-chain-swap function
+    // 3. Wait for transaction confirmation
+    // 4. Return the transaction hash
+
+    // Simulate a transaction hash
+    const txHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
+
+    sendResponse({
+      success: true,
+      txHash,
+    })
+  } catch (error: any) {
+    sendResponse({ success: false, error: error.message })
+  }
 }
 
 // Export for use in other files

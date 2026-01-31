@@ -2,6 +2,9 @@
 import React, { useState, useEffect } from 'react'
 import IntroScreen from './IntroScreen'
 import WalletSetupScreen from './WalletSetupScreen'
+import SendScreen from './SendScreen'
+import SwapScreen from './SwapScreen'
+import ReceiveScreen from './ReceiveScreen'
 
 // Types
 interface LockState {
@@ -72,10 +75,9 @@ const MainScreen: React.FC<{
   settings: Settings
   onLock: () => void
 }> = ({ accounts, settings, onLock }) => {
-  const [activeTab, setActiveTab] = useState<'assets' | 'activity' | 'send'>('assets')
+  const [activeTab, setActiveTab] = useState<'assets' | 'activity'>('assets')
+  const [fullPageView, setFullPageView] = useState<'send' | 'swap' | 'receive' | null>(null)
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(accounts[0] || null)
-  const [showReceiveModal, setShowReceiveModal] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   const handleDisconnect = () => {
     onLock()
@@ -86,154 +88,120 @@ const MainScreen: React.FC<{
     chrome.tabs.create({ url: 'http://localhost:3000/onramp' })
   }
 
-  const handleSwap = () => {
-    // Open the web app's swap page
-    chrome.tabs.create({ url: 'http://localhost:3000/swap' })
+  const handleSend = () => {
+    setFullPageView('send')
   }
 
-  const handleSend = () => {
-    // Open the web app's send page
-    chrome.tabs.create({ url: 'http://localhost:3000/zkWormhole' })
+  const handleSwap = () => {
+    setFullPageView('swap')
+  }
+
+  const handleBack = () => {
+    setFullPageView(null)
   }
 
   const handleReceive = () => {
-    setShowReceiveModal(true)
-  }
-
-  const copyAddress = () => {
-    if (selectedAccount) {
-      navigator.clipboard.writeText(selectedAccount.address)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
+    setFullPageView('receive')
   }
 
   return (
-    <div style={styles.mainContainer}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <span style={styles.headerTitle}>Orbit</span>
-          <select
-            value={settings.selectedNetwork}
-            style={styles.networkSelect}
-            onChange={(e) => {
-              chrome.runtime.sendMessage({
-                type: 'SWITCH_NETWORK',
-                network: e.target.value,
-              })
-            }}
-          >
-            <option value="ethereum">Ethereum</option>
-            <option value="sepolia">Sepolia</option>
-            <option value="polygon">Polygon</option>
-          </select>
-        </div>
-        <button onClick={handleDisconnect} style={styles.lockButton}>
-          🔒
-        </button>
-      </div>
-
-      {/* Account Info */}
-      {selectedAccount && (
-        <div style={styles.accountCard}>
-          <p style={styles.accountLabel}>{selectedAccount.label}</p>
-          <p style={styles.accountAddress}>
-            {selectedAccount.address.slice(0, 6)}...{selectedAccount.address.slice(-4)}
-          </p>
-          <p style={styles.balance}>0.00 ETH</p>
-        </div>
+    <>
+      {/* Full page views */}
+      {fullPageView === 'send' && (
+        <SendScreen account={selectedAccount} onBack={handleBack} />
+      )}
+      {fullPageView === 'swap' && (
+        <SwapScreen account={selectedAccount} onBack={handleBack} />
+      )}
+      {fullPageView === 'receive' && (
+        <ReceiveScreen account={selectedAccount} onBack={handleBack} />
       )}
 
-      {/* Action Buttons */}
-      <div style={styles.actionButtonsContainer}>
-        <button style={styles.actionButton} onClick={handleBuy}>Buy</button>
-        <button style={styles.actionButton} onClick={handleSend}>Send</button>
-        <button style={styles.actionButton} onClick={handleSwap}>Swap</button>
-        <button style={styles.actionButton} onClick={handleReceive}>Receive</button>
-      </div>
-
-      {/* Tabs */}
-      <div style={styles.tabs}>
-        <button
-          onClick={() => setActiveTab('assets')}
-          style={{
-            ...styles.tab,
-            ...(activeTab === 'assets' ? styles.tabActive : {}),
-          }}
-        >
-          Assets
-        </button>
-        <button
-          onClick={() => setActiveTab('activity')}
-          style={{
-            ...styles.tab,
-            ...(activeTab === 'activity' ? styles.tabActive : {}),
-          }}
-        >
-          Activity
-        </button>
-        <button
-          onClick={() => setActiveTab('send')}
-          style={{
-            ...styles.tab,
-            ...(activeTab === 'send' ? styles.tabActive : {}),
-          }}
-        >
-          Send
-        </button>
-      </div>
-
-      {/* Content */}
-      <div style={styles.content}>
-        {activeTab === 'assets' && (
-          <div>
-            <p style={styles.emptyState}>No tokens yet</p>
-            <p style={styles.emptySubtext}>Connect to dApps or receive tokens</p>
-          </div>
-        )}
-        {activeTab === 'activity' && (
-          <div>
-            <p style={styles.emptyState}>No recent activity</p>
-          </div>
-        )}
-        {activeTab === 'send' && (
-          <div>
-            <p style={styles.emptyState}>Send feature coming soon</p>
-          </div>
-        )}
-      </div>
-
-      {/* Receive Modal */}
-      {showReceiveModal && selectedAccount && (
-        <div style={styles.modalOverlay} onClick={() => setShowReceiveModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <h3 style={styles.modalTitle}>Receive Funds</h3>
-              <button
-                style={styles.closeButton}
-                onClick={() => setShowReceiveModal(false)}
+      {/* Main screen */}
+      {!fullPageView && (
+        <div style={styles.mainContainer}>
+          {/* Header */}
+          <div style={styles.header}>
+            <div style={styles.headerLeft}>
+              <span style={styles.headerTitle}>Orbit</span>
+              <select
+                value={settings.selectedNetwork}
+                style={styles.networkSelect}
+                onChange={(e) => {
+                  chrome.runtime.sendMessage({
+                    type: 'SWITCH_NETWORK',
+                    network: e.target.value,
+                  })
+                }}
               >
-                ✕
-              </button>
+                <option value="ethereum">Ethereum</option>
+                <option value="sepolia">Sepolia</option>
+                <option value="polygon">Polygon</option>
+              </select>
             </div>
-            <div style={styles.modalBody}>
-              <p style={styles.modalLabel}>Your Wallet Address</p>
-              <div style={styles.addressBox}>
-                <span style={styles.addressText}>{selectedAccount.address}</span>
-                <button
-                  style={styles.copyButton}
-                  onClick={copyAddress}
-                >
-                  {copied ? '✓' : '📋'}
-                </button>
+            <button onClick={handleDisconnect} style={styles.lockButton}>
+              🔒
+            </button>
+          </div>
+
+          {/* Account Info */}
+          {selectedAccount && (
+            <div style={styles.accountCard}>
+              <p style={styles.accountLabel}>{selectedAccount.label}</p>
+              <p style={styles.accountAddress}>
+                {selectedAccount.address.slice(0, 6)}...{selectedAccount.address.slice(-4)}
+              </p>
+              <p style={styles.balance}>0.00 ETH</p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={styles.actionButtonsContainer}>
+            <button style={styles.actionButton} onClick={handleBuy}>Buy</button>
+            <button style={styles.actionButton} onClick={handleSend}>Send</button>
+            <button style={styles.actionButton} onClick={handleSwap}>Swap</button>
+            <button style={styles.actionButton} onClick={handleReceive}>Receive</button>
+          </div>
+
+          {/* Tabs */}
+          <div style={styles.tabs}>
+            <button
+              onClick={() => setActiveTab('assets')}
+              style={{
+                ...styles.tab,
+                ...(activeTab === 'assets' ? styles.tabActive : {}),
+              }}
+            >
+              Assets
+            </button>
+            <button
+              onClick={() => setActiveTab('activity')}
+              style={{
+                ...styles.tab,
+                ...(activeTab === 'activity' ? styles.tabActive : {}),
+              }}
+            >
+              Activity
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={styles.content}>
+            {activeTab === 'assets' && (
+              <div>
+                <p style={styles.emptyState}>No tokens yet</p>
+                <p style={styles.emptySubtext}>Connect to dApps or receive tokens</p>
               </div>
-              <p style={styles.modalHint}>Send tokens to this address to add funds to your wallet</p>
-            </div>
+            )}
+            {activeTab === 'activity' && (
+              <div>
+                <p style={styles.emptyState}>No recent activity</p>
+              </div>
+            )}
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -581,88 +549,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     transition: 'all 0.2s',
     fontFamily: 'Doto, sans-serif',
-  },
-  modalOverlay: {
-    position: 'fixed' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.8)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '20px',
-  },
-  modalContent: {
-    background: '#111111',
-    borderRadius: '16px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    maxWidth: '400px',
-    width: '100%',
-    maxHeight: '80vh',
-    overflow: 'auto',
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-  },
-  modalTitle: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    margin: 0,
-  },
-  closeButton: {
-    background: 'transparent',
-    border: 'none',
-    color: '#ffffff',
-    fontSize: '24px',
-    cursor: 'pointer',
-    padding: '4px 8px',
-    lineHeight: 1,
-  },
-  modalBody: {
-    padding: '20px',
-  },
-  modalLabel: {
-    fontSize: '14px',
-    color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: '12px',
-  },
-  addressBox: {
-    display: 'flex',
-    gap: '8px',
-    padding: '12px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '8px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    marginBottom: '16px',
-  },
-  addressText: {
-    flex: 1,
-    fontSize: '12px',
-    fontFamily: 'Doto, sans-serif',
-    wordBreak: 'break-all' as const,
-    color: '#ffffff',
-  },
-  copyButton: {
-    background: 'rgba(255, 118, 168, 0.2)',
-    border: '1px solid rgba(255, 118, 168, 0.3)',
-    borderRadius: '6px',
-    padding: '8px 12px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    flexShrink: 0,
-  },
-  modalHint: {
-    fontSize: '13px',
-    color: 'rgba(255, 255, 255, 0.4)',
-    textAlign: 'center' as const,
-    margin: 0,
   },
 }
 

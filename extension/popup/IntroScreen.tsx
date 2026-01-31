@@ -7,15 +7,15 @@ const IntroScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   const animationRef = useRef<number>(0)
 
   useEffect(() => {
-    // Start fade out after 2.5 seconds
+    // Start fade out after 1.6 seconds
     const fadeTimer = setTimeout(() => {
       setOpacity(0)
-    }, 2500)
+    }, 1600)
 
-    // Call onComplete after animation finishes (3 seconds total)
+    // Call onComplete after animation finishes (2.1 seconds total)
     const completeTimer = setTimeout(() => {
       onComplete()
-    }, 3000)
+    }, 2100)
 
     return () => {
       clearTimeout(fadeTimer)
