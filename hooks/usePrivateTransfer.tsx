@@ -1,8 +1,13 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+<<<<<<< Updated upstream
 import { useAccount } from 'wagmi';
 import { parseUnits } from 'ethers';
+=======
+import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import { parseUnits, erc20Abi, type Address, type Hex } from 'viem';
+>>>>>>> Stashed changes
 import { useRailgunWallet } from './useRailgunWallet';
 import { useRailgunEngine } from './useRailgunEngine';
 import { TOKENS, EXPLORER_URL } from '@/lib/wagmi';
@@ -88,7 +93,14 @@ const STEP_MESSAGES: Record<TransferStep, string> = {
 
 export function usePrivateTransfer() {
   const { address: senderAddress } = useAccount();
+<<<<<<< Updated upstream
   const { wallet, mnemonic } = useRailgunWallet();
+=======
+  const chainId = useChainId();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const { wallet } = useRailgunWallet();
+>>>>>>> Stashed changes
   const { status: engineStatus, initialize: initEngine } = useRailgunEngine();
 
   const [state, setState] = useState<PrivateTransferState>({
@@ -109,6 +121,121 @@ export function usePrivateTransfer() {
     }));
   }, []);
 
+<<<<<<< Updated upstream
+=======
+  /**
+   * Get permit domain for a token
+   * Each EIP-2612 token has its own domain with specific name/version
+   */
+  const getTokenDomain = useCallback((tokenAddress: string) => {
+    const normalized = tokenAddress.toLowerCase();
+
+    // Look up token metadata for proper domain values
+    for (const [addr, meta] of Object.entries(TOKEN_METADATA)) {
+      if (addr.toLowerCase() === normalized) {
+        return {
+          name: meta.name,
+          version: meta.version || '1',
+          chainId: chainId,
+          verifyingContract: tokenAddress as Address,
+        };
+      }
+    }
+
+    // Fallback for unknown tokens - this may fail if domain doesn't match
+    console.warn(`[PrivateTransfer] Unknown token ${tokenAddress}, using default permit domain`);
+    return {
+      name: 'Token',
+      version: '1',
+      chainId: chainId,
+      verifyingContract: tokenAddress as Address,
+    };
+  }, [chainId]);
+
+  /**
+   * Sign an EIP-2612 permit for gasless approval
+   * @param tokenAddress - The token to sign permit for
+   * @param amount - Amount to approve
+   * @param deadline - Permit expiration timestamp
+   */
+  const signPermit = useCallback(async (
+    tokenAddress: string,
+    amount: bigint,
+    deadline: bigint
+  ): Promise<PermitData> => {
+    if (!walletClient || !senderAddress || !publicClient) {
+      throw new Error('Wallet not connected');
+    }
+
+    // Get current nonce for user
+    const nonce = await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: NONCES_ABI,
+      functionName: 'nonces',
+      args: [senderAddress],
+    });
+
+    const domain = getTokenDomain(tokenAddress);
+
+    const message = {
+      owner: senderAddress,
+      spender: RELAYER_ADDRESS,
+      value: amount,
+      nonce,
+      deadline,
+    };
+
+    // Request signature from wallet
+    const signature = await walletClient.signTypedData({
+      account: senderAddress,
+      domain,
+      types: PERMIT_TYPES,
+      primaryType: 'Permit',
+      message,
+    });
+
+    // Parse signature into v, r, s
+    const r = `0x${signature.slice(2, 66)}` as Hex;
+    const s = `0x${signature.slice(66, 130)}` as Hex;
+    const v = parseInt(signature.slice(130, 132), 16);
+
+    return {
+      owner: senderAddress,
+      spender: RELAYER_ADDRESS,
+      value: amount.toString(),
+      deadline: deadline.toString(),
+      v,
+      r,
+      s,
+    };
+  }, [walletClient, senderAddress, publicClient, getTokenDomain]);
+
+  /**
+   * Check if user already has sufficient allowance
+   */
+  const checkAllowance = useCallback(async (
+    amount: bigint,
+    tokenAddress: string
+  ): Promise<boolean> => {
+    if (!publicClient || !senderAddress) return false;
+
+    const allowance = await publicClient.readContract({
+      address: tokenAddress as Address,
+      abi: erc20Abi,
+      functionName: 'allowance',
+      args: [senderAddress, RELAYER_ADDRESS],
+    });
+
+    return allowance >= amount;
+  }, [publicClient, senderAddress]);
+
+  /**
+   * Execute a private transfer supporting multiple recipients and tokens.
+   * 
+   * @param recipients - Array of recipients, each with address, amount, and optional token
+   * @param defaultTokenAddress - Default token for recipients without explicit token
+   */
+>>>>>>> Stashed changes
   const executePrivateTransfer = useCallback(async (
     recipients: TransferRecipient[],
     tokenAddress: string = TOKENS.USDC,

@@ -1,19 +1,23 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { sepolia } from 'wagmi/chains';
+import { sepolia, arbitrum, polygon } from 'wagmi/chains';
 import { http } from 'wagmi';
 
 // RainbowKit project ID - get one at https://cloud.walletconnect.com
 // Using a demo ID for development - replace in production
 const WALLETCONNECT_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo-project-id';
 
-// RPC URL matching RAILGUN config
+// RPC URLs
 const SEPOLIA_RPC_URL = 'https://eth-sepolia.g.alchemy.com/v2/lO9FWaEPl-y8mMJHInELW';
+const ARBITRUM_RPC_URL = 'https://arb-mainnet.g.alchemy.com/v2/QI9bvj-No95T_XdPXgq01';
+const POLYGON_RPC_URL = 'https://polygon-mainnet.g.alchemy.com/v2/sU2Ws5QkZbj_8HPNgRDpg';
 
 export const config = getDefaultConfig({
   appName: 'Orbit',
   projectId: WALLETCONNECT_PROJECT_ID,
-  chains: [sepolia],
+  chains: [arbitrum, polygon, sepolia],
   transports: {
+    [arbitrum.id]: http(ARBITRUM_RPC_URL),
+    [polygon.id]: http(POLYGON_RPC_URL),
     [sepolia.id]: http(SEPOLIA_RPC_URL),
   },
   ssr: true,

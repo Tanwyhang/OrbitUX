@@ -12,12 +12,13 @@ import { StealthModeProvider, useStealthMode } from './contexts/StealthModeConte
 function MainAppLayoutContent({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const isZkWormhole = pathname === '/zkWormhole'
+  const isSwap = pathname === '/swap'
   const { stealthMode } = useStealthMode()
-  
-  // Show PixelBlast at 0.8 opacity on all pages except zkWormhole
-  // On zkWormhole, the opacity is controlled separately by stealth mode
-  const pixelBlastOpacity = isZkWormhole 
-    ? (stealthMode ? 0.85 : 0) 
+
+  // Show PixelBlast at 0.8 opacity on all pages
+  // On zkWormhole and swap pages, opacity is controlled by stealth mode
+  const pixelBlastOpacity = (isZkWormhole || isSwap)
+    ? (stealthMode ? 0.85 : 0)
     : 0.8
 
   const navItems: NavItem[] = [

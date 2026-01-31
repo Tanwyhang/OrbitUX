@@ -1,77 +1,126 @@
 'use client';
 
+/**
+ * Swap Content (Legacy - now uses unified config)
+ * This component is kept for backwards compatibility.
+ * For new implementations, use SimplifiedSwapContent instead.
+ */
+
 import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, useChainId } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { TokenETH, TokenUSDT, TokenEURC } from '@web3icons/react';
 import type { ComponentType, SVGProps } from 'react';
-import type { PoolToken, TokenSymbol } from '@/lib/swap/types';
-import { 
-  TOKEN_LIST, 
-  TOKENS,
-  formatTokenAmount, 
-  formatRoutePath,
-  HIGH_SLIPPAGE_THRESHOLD,
-} from '@/lib/swap';
-import { usePoolQuote } from '@/hooks/usePoolQuote';
-import { usePoolSwap, getExplorerLink } from '@/hooks/usePoolSwap';
+import type { TokenConfig } from '@/lib/swap/unifiedConfig';
+import {
+  getTokensForChain,
+  getTokenConfig,
+  SUPPORTED_CHAINS,
+} from '@/lib/swap/unifiedConfig';
+import { useUniswapQuote } from '@/hooks/useUniswapQuote';
+import { useUniswapSwap, getExplorerLink } from '@/hooks/useUniswapSwap';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
+import { usePrivateSwap } from '@/hooks/usePrivateSwap';
 import SlippageSettings, { useSlippageStorage } from './SlippageSettings';
 
 // Token icon mapping
 type Web3IconComponent = ComponentType<SVGProps<SVGSVGElement> & { variant?: 'branded' | 'mono'; className?: string }>;
-const TOKEN_ICONS: Record<TokenSymbol, Web3IconComponent> = {
+const TOKEN_ICONS: Record<string, Web3IconComponent> = {
   ETH: TokenETH,
   USDT: TokenUSDT,
   EURC: TokenEURC,
+  USDC: TokenUSDT, // Use USDT icon as fallback for USDC
+  DAI: TokenUSDT,   // Use USDT icon as fallback for DAI
+  WBTC: TokenETH,   // Use ETH icon as fallback for WBTC
 };
 
 // Helper component to render token icon
-function TokenIcon({ symbol, className }: { symbol: TokenSymbol; className?: string }) {
+function TokenIcon({ symbol, className }: { symbol: string; className?: string }) {
   const Icon = TOKEN_ICONS[symbol];
   return Icon ? <Icon variant="branded" className={className} /> : null;
 }
 
+// Helper to format token amount
+function formatTokenAmount(amount: bigint, decimals: number, displayDecimals: number = 6): string {
+  if (amount === BigInt(0)) return '0';
+  const divisor = BigInt(10) ** BigInt(decimals);
+  const integerPart = amount / divisor;
+  const fractionalPart = amount % divisor;
+  const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
+  const trimmedFractional = fractionalStr.slice(0, displayDecimals);
+  if (trimmedFractional === '0'.repeat(displayDecimals)) {
+    return integerPart.toString();
+  }
+  const cleanedFractional = trimmedFractional.replace(/0+$/, '');
+  return `${integerPart}.${cleanedFractional}`;
+}
+
+const HIGH_SLIPPAGE_THRESHOLD = 2.0;
+
 export default function SwapContent() {
   const { address, isConnected } = useAccount();
-  
+  const chainId = useChainId();
+
+  // Get tokens for current chain (default to Arbitrum if unsupported)
+  const supportedChainId = Object.values(SUPPORTED_CHAINS).includes(chainId as any)
+    ? (chainId as typeof SUPPORTED_CHAINS[keyof typeof SUPPORTED_CHAINS])
+    : SUPPORTED_CHAINS.ARBITRUM;
+
+  const tokenList = getTokensForChain(supportedChainId);
+
   // Token selection
-  const [fromToken, setFromToken] = useState<PoolToken>(TOKENS.ETH);
-  const [toToken, setToToken] = useState<PoolToken>(TOKENS.USDT);
+  const [fromToken, setFromToken] = useState<TokenConfig>(tokenList[0]); // Defaults to first token (ETH/WETH)
+  const [toToken, setToToken] = useState<TokenConfig>(tokenList[1]);     // Defaults to second token (USDC/USDT)
   
   // Amount input
   const [fromAmount, setFromAmount] = useState('');
-  
+
+  // Private mode (RAILGUN) - MAIN FEATURE
+  const [privateMode, setPrivateMode] = useState(true);
+
   // Slippage settings
   const [slippage, setSlippage] = useSlippageStorage();
   const [showSlippageSettings, setShowSlippageSettings] = useState(false);
-  
-  // Privacy mode
-  const [privateMode, setPrivateMode] = useState(true);
-  
+
   // Dropdown visibility
   const [showFromTokenDropdown, setShowFromTokenDropdown] = useState(false);
   const [showToTokenDropdown, setShowToTokenDropdown] = useState(false);
   
   // Hooks
   const { balances, refetch: refetchBalances } = useTokenBalances();
-  const { quote, isLoading: isQuoteLoading, error: quoteError } = usePoolQuote({
+
+  // Private swap hook (RAILGUN)
+  const { executePrivateSwap, progress: privateProgress, isSwapping: isPrivateSwapping, reset: resetPrivate } = usePrivateSwap();
+
+  // Uniswap hooks - used for BOTH private and public modes
+  const { quote: uniswapQuote, isLoading: isQuoteLoading, error: quoteError } = useUniswapQuote({
     fromToken,
     toToken,
     inputAmount: fromAmount,
     slippage,
-    enabled: isConnected,
+    enabled: isConnected, // Always enabled for both modes
   });
-  const { executeSwap, progress, isSwapping, reset } = usePoolSwap();
+  const { executeSwap: executeUniswapSwap, progress: uniswapProgress, isSwapping: isUniswapSwapping, reset: resetUniswap } = useUniswapSwap();
+
+  // Unified state based on mode
+  const currentQuote = uniswapQuote;
+  const isSwapping = privateMode ? isPrivateSwapping : isUniswapSwapping;
+  const progress = privateMode ? {
+    step: privateProgress?.step || 'idle',
+    message: privateProgress?.message || '',
+    inputShieldTxHash: privateProgress?.inputShieldTxHash,
+    swapTxHash: privateProgress?.swapTxHash,
+    error: privateProgress?.error,
+  } : uniswapProgress;
 
   // Get formatted output amount
-  const outputAmount = quote 
-    ? formatTokenAmount(quote.outputAmount, toToken.decimals, 6)
+  const outputAmount = currentQuote
+    ? formatTokenAmount(currentQuote.outputAmount, toToken.decimals, 6)
     : '';
 
   // Get formatted minimum received
-  const minReceived = quote
-    ? formatTokenAmount(quote.minimumReceived, toToken.decimals, 6)
+  const minReceived = currentQuote
+    ? formatTokenAmount(currentQuote.minimumReceived, toToken.decimals, 6)
     : '';
 
   // Get formatted balance
@@ -100,14 +149,29 @@ export default function SwapContent() {
 
   // Execute swap
   const handleSwap = async () => {
-    if (!quote) return;
-    
-    const result = await executeSwap(quote, privateMode);
-    
-    if (result.success) {
-      // Refresh balances after successful swap
-      refetchBalances();
-      setFromAmount('');
+    if (!currentQuote) return;
+
+    let result;
+
+    if (privateMode) {
+      // Use RAILGUN private swap + Uniswap (via DEX adapter)
+      // Note: This will use the standardized private swap service with Uniswap adapter
+      result = await executePrivateSwap(currentQuote);
+
+      if (result.success) {
+        refetchBalances();
+        setFromAmount('');
+        resetPrivate();
+      }
+    } else {
+      // Use Uniswap v3 public swap (direct)
+      result = await executeUniswapSwap(currentQuote);
+
+      if (result.success) {
+        refetchBalances();
+        setFromAmount('');
+        resetUniswap();
+      }
     }
   };
 
@@ -131,7 +195,7 @@ export default function SwapContent() {
     if (quoteError) {
       return { text: 'No Route Available', disabled: true };
     }
-    if (!quote) {
+    if (!currentQuote) {
       return { text: 'Enter Amount', disabled: true };
     }
     return { text: 'Swap', disabled: false };
@@ -160,15 +224,28 @@ export default function SwapContent() {
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Quick Swap</h3>
-              <button
-                onClick={() => setShowSlippageSettings(!showSlippageSettings)}
-                className="p-2 rounded-lg hover:bg-white/10 transition-colors text-muted hover:text-white"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Private Mode Toggle */}
+                <button
+                  onClick={() => setPrivateMode(!privateMode)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    privateMode
+                      ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30'
+                      : 'bg-white/5 text-muted hover:text-white border border-white/10'
+                  }`}
+                >
+                  {privateMode ? '🔒 Private' : 'Public'}
+                </button>
+                <button
+                  onClick={() => setShowSlippageSettings(!showSlippageSettings)}
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors text-muted hover:text-white"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Slippage Settings Panel */}
@@ -237,7 +314,7 @@ export default function SwapContent() {
                   {/* From Token Dropdown */}
                   {showFromTokenDropdown && (
                     <div className="rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 max-h-60 overflow-y-auto">
-                      {TOKEN_LIST.filter(t => t.symbol !== toToken.symbol).map((token) => (
+                      {tokenList.filter(t => t.address.toLowerCase() !== toToken.address.toLowerCase()).map((token) => (
                         <button
                           key={token.symbol}
                           onClick={(e) => {
@@ -320,7 +397,7 @@ export default function SwapContent() {
                   {/* To Token Dropdown */}
                   {showToTokenDropdown && (
                     <div className="rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 max-h-60 overflow-y-auto">
-                      {TOKEN_LIST.filter(t => t.symbol !== fromToken.symbol).map((token) => (
+                      {tokenList.filter(t => t.address.toLowerCase() !== fromToken.address.toLowerCase()).map((token) => (
                         <button
                           key={token.symbol}
                           onClick={(e) => {
@@ -346,16 +423,24 @@ export default function SwapContent() {
               </div>
 
               {/* Swap Details */}
-              {quote && (
+              {currentQuote && (
                 <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2 text-sm">
                   <div className="flex items-center justify-between">
+                    <span className="text-muted">Mode</span>
+                    <span className={`font-medium ${privateMode ? 'text-pink-400' : 'text-blue-400'}`}>
+                      {privateMode ? 'Private (RAILGUN)' : 'Public (Uniswap)'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
                     <span className="text-muted">Route</span>
-                    <span className="font-medium">{formatRoutePath(quote.route)}</span>
+                    <span className="font-medium">
+                      {uniswapQuote?.route.tokenPath.map(t => t.symbol).join(' → ') || '-'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted">Price Impact</span>
-                    <span className={`font-medium ${quote.priceImpact > 1 ? 'text-yellow-400' : ''}`}>
-                      {quote.priceImpact.toFixed(2)}%
+                    <span className={`font-medium ${currentQuote.priceImpact > 1 ? 'text-yellow-400' : ''}`}>
+                      {currentQuote.priceImpact.toFixed(2)}%
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -371,6 +456,7 @@ export default function SwapContent() {
                 </div>
               )}
 
+<<<<<<< Updated upstream
               {/* Privacy Toggle */}
               <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-black/20">
                 <div className="flex items-center gap-2">
@@ -401,10 +487,20 @@ export default function SwapContent() {
                 <div className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-black/20">
                   <div className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full" />
                   <span className="text-sm">{progress.message}</span>
+=======
+              {/* Transaction Progress */}
+              {isSwapping && (
+                <div className="space-y-2 p-3 rounded-xl border border-white/10 bg-black/20">
+                  <div className="flex items-center gap-3">
+                    <div className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full" />
+                    <span className="text-sm">{progress.message}</span>
+                  </div>
+>>>>>>> Stashed changes
                 </div>
               )}
 
               {/* Success Message */}
+<<<<<<< Updated upstream
               {progress.step === 'complete' && progress.txHash && (
                 <div className="flex items-center justify-between p-3 rounded-xl border border-green-500/20 bg-green-500/10">
                   <div className="flex items-center gap-2">
@@ -421,16 +517,51 @@ export default function SwapContent() {
                   >
                     View TX
                   </a>
+=======
+              {progress.step === 'complete' && (('txHash' in progress && progress.txHash) || ('swapTxHash' in progress && progress.swapTxHash)) && (
+                <div className="space-y-2 p-3 rounded-xl border border-green-500/20 bg-green-500/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-sm text-green-500">
+                        {privateMode ? 'Private swap complete!' : 'Swap complete!'}
+                      </span>
+                    </div>
+                    {'txHash' in progress && progress.txHash && (
+                      <a
+                        href={getExplorerLink(progress.txHash, fromToken.chainId)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-green-500 hover:underline"
+                      >
+                        View TX
+                      </a>
+                    )}
+                  </div>
+                  {/* Private swap shows additional TXs */}
+                  {privateMode && 'inputShieldTxHash' in progress && progress.inputShieldTxHash && (
+                    <div className="text-xs text-green-400 mt-1 space-y-1">
+                      <div>Shield: <span className="opacity-70">{progress.inputShieldTxHash.slice(0, 10)}...</span></div>
+                      {'swapTxHash' in progress && progress.swapTxHash && (
+                        <div>Swap: <span className="opacity-70">{progress.swapTxHash.slice(0, 10)}...</span></div>
+                      )}
+                    </div>
+                  )}
+>>>>>>> Stashed changes
                 </div>
               )}
 
               {/* Error Message */}
-              {progress.step === 'error' && progress.error && (
+              {progress.step === 'error' && (
                 <div className="flex items-center gap-2 p-3 rounded-xl border border-red-500/20 bg-red-500/10">
                   <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                  <span className="text-sm text-red-500">{progress.error.message}</span>
+                  <span className="text-sm text-red-500">
+                    {'error' in progress && typeof progress.error === 'string' ? progress.error : 'Swap failed'}
+                  </span>
                 </div>
               )}
 

@@ -71,6 +71,27 @@ export function usePoolSwap(): UsePoolSwapResult {
       };
     }
 
+<<<<<<< Updated upstream
+=======
+    // Use private swap flow when privateMode is enabled
+    if (privateMode) {
+      console.log('[usePoolSwap] Private swap via usePoolSwap is deprecated. Use usePrivateSwap hook with Uniswap quotes instead.');
+
+      const err = new Error('Private swap via usePoolSwap is deprecated. Use usePrivateSwap hook with Uniswap quotes instead.');
+      setProgress({
+        step: 'error',
+        message: err.message,
+        error: err,
+      });
+
+      return {
+        success: false,
+        error: err,
+      };
+    }
+
+    // Public swap flow
+>>>>>>> Stashed changes
     setIsSwapping(true);
     
     try {
@@ -111,6 +132,8 @@ export function usePoolSwap(): UsePoolSwapResult {
             functionName: 'approve',
             args: [pool.address, MAX_UINT256],
             gas: BigInt(100000), // Explicit gas limit for approval
+            account: address,
+            chain: null,
           });
 
           // Wait for approval confirmation
@@ -155,6 +178,8 @@ export function usePoolSwap(): UsePoolSwapResult {
           functionName: 'swap',
           args: [amount0In, amount1In, amount0OutMin, amount1OutMin, address],
           gas: BigInt(300000), // Explicit gas limit for swap
+          account: address,
+          chain: null,
         });
 
         // Wait for swap confirmation
