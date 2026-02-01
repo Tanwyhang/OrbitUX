@@ -13,6 +13,7 @@
     "preview:extension": "vite build && echo 'Load extension-dist in Chrome at chrome://extensions'"
   },
   "dependencies": {
+    "@metamask/sdk": "^0.34.0",
     "@railgun-community/shared-models": "^8.0.0",
     "@railgun-community/wallet": "^10.8.1",
     "@rainbow-me/rainbowkit": "^2.2.10",
@@ -34,7 +35,7 @@
     "snarkjs": "^0.7.6",
     "tailwind-merge": "^3.4.0",
     "three": "^0.182.0",
-    "viem": "2.x",
+    "viem": "^2.45.1",
     "wagmi": "^3.4.1"
   },
   "devDependencies": {

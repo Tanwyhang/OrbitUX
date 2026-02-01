@@ -51,9 +51,18 @@ function ChainIcon({
 // Token list from cross-chain config
 const TOKEN_LIST = Object.values(CROSS_CHAIN_TOKENS);
 
+// Chain options for source (all supported chains)
+const SOURCE_CHAIN_OPTIONS = [
+  { id: CHAIN_IDS.SEPOLIA, name: CHAIN_NAMES[CHAIN_IDS.SEPOLIA] },
+  ...SUPPORTED_DESTINATION_CHAINS.map((id) => ({
+    id,
+    name: CHAIN_NAMES[id] || `Chain ${id}`,
+  })),
+];
+
 // Chain options for destination
-const CHAIN_OPTIONS = [
-  { id: CHAIN_IDS.SEPOLIA, name: 'Sepolia (Same Chain)' },
+const DEST_CHAIN_OPTIONS = [
+  { id: CHAIN_IDS.SEPOLIA, name: CHAIN_NAMES[CHAIN_IDS.SEPOLIA] },
   ...SUPPORTED_DESTINATION_CHAINS.map((id) => ({
     id,
     name: CHAIN_NAMES[id] || `Chain ${id}`,
@@ -83,8 +92,9 @@ export default function CrossChainSwapContent() {
   const [fromToken, setFromToken] = useState<PoolToken>(CROSS_CHAIN_TOKENS.ETH);
   const [toToken, setToToken] = useState<PoolToken>(CROSS_CHAIN_TOKENS.USDT);
 
-  // Destination chain
-  const [destChainId, setDestChainId] = useState<ChainId>(CHAIN_IDS.SEPOLIA);
+  // Source and destination chains
+  const [fromChainId, setFromChainId] = useState<ChainId>(CHAIN_IDS.SEPOLIA);
+  const [destChainId, setDestChainId] = useState<ChainId>(CHAIN_IDS.ARBITRUM_SEPOLIA);
 
   // Amount input
   const [fromAmount, setFromAmount] = useState('');
@@ -101,7 +111,8 @@ export default function CrossChainSwapContent() {
   // Dropdown visibility
   const [showFromTokenDropdown, setShowFromTokenDropdown] = useState(false);
   const [showToTokenDropdown, setShowToTokenDropdown] = useState(false);
-  const [showChainDropdown, setShowChainDropdown] = useState(false);
+  const [showFromChainDropdown, setShowFromChainDropdown] = useState(false);
+  const [showToChainDropdown, setShowToChainDropdown] = useState(false);
 
   // Hooks
   const { balances, refetch: refetchBalances } = useTokenBalances();
@@ -165,7 +176,7 @@ export default function CrossChainSwapContent() {
 
     const debounceTimeout = setTimeout(fetchQuote, 300);
     return () => clearTimeout(debounceTimeout);
-  }, [fromAmount, fromToken, toToken, destChainId, slippage, getQuote, parseAmount]);
+  }, [fromAmount, fromToken, toToken, fromChainId, destChainId, slippage, getQuote, parseAmount]);
 
   // Get formatted output amount
   const outputAmount = quote
@@ -193,12 +204,18 @@ export default function CrossChainSwapContent() {
   })();
 
   // Is cross-chain operation
-  const isCrossChain = destChainId !== CHAIN_IDS.SEPOLIA;
+  const isCrossChain = fromChainId !== destChainId;
 
-  // Swap direction
+  // Swap direction - swap tokens, chains, and amount
   const handleSwapDirection = () => {
+    const tempToken = fromToken;
     setFromToken(toToken);
-    setToToken(fromToken);
+    setToToken(tempToken);
+
+    const tempChain = fromChainId;
+    setFromChainId(destChainId);
+    setDestChainId(tempChain);
+
     setFromAmount(outputAmount);
   };
 
@@ -259,7 +276,7 @@ export default function CrossChainSwapContent() {
     if (quote.type === 'cross_chain_swap') {
       return { text: `Swap to ${CHAIN_NAMES[destChainId]}`, disabled: false };
     }
-    return { text: 'Swap', disabled: false };
+    return { text: isCrossChain ? `Swap to ${CHAIN_NAMES[destChainId]}` : 'Swap', disabled: false };
   };
 
   const buttonState = getButtonState();
@@ -269,14 +286,15 @@ export default function CrossChainSwapContent() {
     const handleClickOutside = () => {
       setShowFromTokenDropdown(false);
       setShowToTokenDropdown(false);
-      setShowChainDropdown(false);
+      setShowFromChainDropdown(false);
+      setShowToChainDropdown(false);
     };
 
-    if (showFromTokenDropdown || showToTokenDropdown || showChainDropdown) {
+    if (showFromTokenDropdown || showToTokenDropdown || showFromChainDropdown || showToChainDropdown) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [showFromTokenDropdown, showToTokenDropdown, showChainDropdown]);
+  }, [showFromTokenDropdown, showToTokenDropdown, showFromChainDropdown, showToChainDropdown]);
 
   return (
     <div className="px-6 py-8">
@@ -329,80 +347,10 @@ export default function CrossChainSwapContent() {
             )}
 
             <div className="space-y-4">
-              {/* Destination Chain Selector */}
-              <div className="space-y-2">
-                <label className="text-sm text-muted">Destination Chain</label>
-                <div className="relative">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowChainDropdown(!showChainDropdown);
-                    }}
-                    className="w-full flex items-center justify-between rounded-xl border border-white/10 bg-black/30 p-3 hover:bg-white/5 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <ChainIcon chainId={destChainId} className="w-6 h-6" />
-                      <span className="font-medium">
-                        {CHAIN_NAMES[destChainId] || `Chain ${destChainId}`}
-                      </span>
-                    </div>
-                    <svg
-                      className="w-4 h-4 text-muted"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
-
-                  {showChainDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 z-20">
-                      {CHAIN_OPTIONS.map((chain) => (
-                        <button
-                          key={chain.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDestChainId(chain.id);
-                            setShowChainDropdown(false);
-                          }}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-left ${
-                            destChainId === chain.id ? 'bg-white/5' : ''
-                          }`}
-                        >
-                          <ChainIcon chainId={chain.id} className="w-6 h-6" />
-                          <span className="font-medium">{chain.name}</span>
-                          {destChainId === chain.id && (
-                            <svg
-                              className="w-4 h-4 ml-auto text-green-500"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* From Token */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm text-muted">From (Sepolia)</label>
+                  <label className="text-sm text-muted">From</label>
                   <span className="text-xs text-muted">
                     Balance: {fromBalance} {fromToken.symbol}
                   </span>
@@ -414,6 +362,8 @@ export default function CrossChainSwapContent() {
                         e.stopPropagation();
                         setShowFromTokenDropdown(!showFromTokenDropdown);
                         setShowToTokenDropdown(false);
+                        setShowFromChainDropdown(false);
+                        setShowToChainDropdown(false);
                       }}
                       className="h-10 w-10 flex items-center justify-center hover:opacity-80 transition-opacity"
                     >
@@ -445,11 +395,62 @@ export default function CrossChainSwapContent() {
                           e.stopPropagation();
                           setShowFromTokenDropdown(!showFromTokenDropdown);
                           setShowToTokenDropdown(false);
+                          setShowFromChainDropdown(false);
+                          setShowToChainDropdown(false);
                         }}
                         className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm font-medium"
                       >
                         {fromToken.symbol}
                       </button>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowFromChainDropdown(!showFromChainDropdown);
+                            setShowToChainDropdown(false);
+                            setShowFromTokenDropdown(false);
+                            setShowToTokenDropdown(false);
+                          }}
+                          className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm font-medium"
+                        >
+                          <ChainIcon chainId={fromChainId} className="w-5 h-5" />
+                        </button>
+                        {showFromChainDropdown && (
+                          <div className="absolute top-full right-0 mt-2 rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 z-20 min-w-[180px]">
+                            {SOURCE_CHAIN_OPTIONS.map((chain) => (
+                              <button
+                                key={chain.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFromChainId(chain.id);
+                                  setShowFromChainDropdown(false);
+                                }}
+                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-left ${
+                                  fromChainId === chain.id ? 'bg-white/5' : ''
+                                }`}
+                              >
+                                <ChainIcon chainId={chain.id} className="w-6 h-6" />
+                                <span className="font-medium text-sm">{chain.name}</span>
+                                {fromChainId === chain.id && (
+                                  <svg
+                                    className="w-4 h-4 ml-auto text-green-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -517,9 +518,7 @@ export default function CrossChainSwapContent() {
               {/* To Token */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm text-muted">
-                    To ({CHAIN_NAMES[destChainId]})
-                  </label>
+                  <label className="text-sm text-muted">To</label>
                   {!isCrossChain && (
                     <span className="text-xs text-muted">
                       Balance: {toBalance} {toToken.symbol}
@@ -533,6 +532,8 @@ export default function CrossChainSwapContent() {
                         e.stopPropagation();
                         setShowToTokenDropdown(!showToTokenDropdown);
                         setShowFromTokenDropdown(false);
+                        setShowFromChainDropdown(false);
+                        setShowToChainDropdown(false);
                       }}
                       className="h-10 w-10 flex items-center justify-center hover:opacity-80 transition-opacity"
                     >
@@ -549,16 +550,69 @@ export default function CrossChainSwapContent() {
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowToTokenDropdown(!showToTokenDropdown);
-                        setShowFromTokenDropdown(false);
-                      }}
-                      className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm font-medium"
-                    >
-                      {toToken.symbol}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowToTokenDropdown(!showToTokenDropdown);
+                          setShowFromTokenDropdown(false);
+                          setShowFromChainDropdown(false);
+                          setShowToChainDropdown(false);
+                        }}
+                        className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm font-medium"
+                      >
+                        {toToken.symbol}
+                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowToChainDropdown(!showToChainDropdown);
+                            setShowFromChainDropdown(false);
+                            setShowFromTokenDropdown(false);
+                            setShowToTokenDropdown(false);
+                          }}
+                          className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm font-medium"
+                        >
+                          <ChainIcon chainId={destChainId} className="w-5 h-5" />
+                        </button>
+                        {showToChainDropdown && (
+                          <div className="absolute top-full right-0 mt-2 rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 z-20 min-w-[180px]">
+                            {DEST_CHAIN_OPTIONS.map((chain) => (
+                              <button
+                                key={chain.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDestChainId(chain.id);
+                                  setShowToChainDropdown(false);
+                                }}
+                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 transition-colors text-left ${
+                                  destChainId === chain.id ? 'bg-white/5' : ''
+                                }`}
+                              >
+                                <ChainIcon chainId={chain.id} className="w-6 h-6" />
+                                <span className="font-medium text-sm">{chain.name}</span>
+                                {destChainId === chain.id && (
+                                  <svg
+                                    className="w-4 h-4 ml-auto text-green-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* To Token Dropdown */}
@@ -597,6 +651,12 @@ export default function CrossChainSwapContent() {
               {quote && (
                 <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2 text-sm">
                   <div className="flex items-center justify-between">
+                    <span className="text-muted">Route</span>
+                    <span className="font-medium">
+                      {CHAIN_NAMES[fromChainId]} → {CHAIN_NAMES[destChainId]}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
                     <span className="text-muted">Operation</span>
                     <span className="font-medium capitalize">
                       {quote.type.replace('_', ' ')}
@@ -629,14 +689,6 @@ export default function CrossChainSwapContent() {
                       </span>
                     </div>
                   )}
-                  {isCrossChain && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted">Destination</span>
-                      <span className="font-medium text-[hsl(var(--pink))]">
-                        {CHAIN_NAMES[destChainId]}
-                      </span>
-                    </div>
-                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-muted">Slippage</span>
                     <span
@@ -647,31 +699,6 @@ export default function CrossChainSwapContent() {
                       {slippage}%
                     </span>
                   </div>
-                </div>
-              )}
-
-              {/* Cross-chain indicator */}
-              {isCrossChain && (
-                <div className="flex items-center justify-between p-3 rounded-xl border border-[hsl(var(--pink))]/20 bg-[hsl(var(--pink))]/5">
-                  <div className="flex items-center gap-2">
-                    <svg
-                      className="w-5 h-5 text-[hsl(var(--pink))]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    </svg>
-                    <span className="text-sm font-medium">Cross-Chain</span>
-                  </div>
-                  <span className="text-xs text-muted">
-                    Tokens will be bridged
-                  </span>
                 </div>
               )}
 
@@ -702,41 +729,32 @@ export default function CrossChainSwapContent() {
               {/* Success Message */}
               {progress.step === 'complete' && progress.sourceTxHash && (
                 <div className="space-y-2 p-3 rounded-xl border border-green-500/20 bg-green-500/10">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <svg
-                        className="w-5 h-5 text-green-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      <span className="text-sm text-green-500">
-                        {isCrossChain
-                          ? 'Cross-chain operation initiated!'
-                          : 'Swap complete!'}
-                      </span>
-                    </div>
-                    <a
-                      href={getExplorerLink(progress.sourceTxHash)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-green-500 hover:underline"
+                  <div className="flex items-center gap-2">
+                    <svg
+                      className="w-5 h-5 text-green-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      View TX
-                    </a>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <span className="text-sm text-green-500">
+                      Transaction successful
+                    </span>
                   </div>
-                  {isCrossChain && (
-                    <p className="text-xs text-green-400/70">
-                      Your tokens are being bridged. This may take a few minutes.
-                    </p>
-                  )}
+                  <a
+                    href={getExplorerLink(progress.sourceTxHash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-xs text-green-500 hover:underline font-mono break-all"
+                  >
+                    {progress.sourceTxHash}
+                  </a>
                 </div>
               )}
 
