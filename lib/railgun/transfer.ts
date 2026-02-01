@@ -45,12 +45,36 @@ import type {
   TransferProgress, 
   GasAbstractionMethod, 
   PermitData, 
-  EIP7702Authorization 
+  EIP7702Authorization,
+  TransferRecipientInput,
+  TokenShieldResult,
+  RecipientUnshieldResult,
 } from "./types";
 
 // Network config - RAILGUN proxy contract on Sepolia
 // This is the contract that populateShield() sends tokens to
 const RAILGUN_PROXY = "0xeCFCf3b4eC647c4Ca6D49108b311b7a7C9543fea";
+
+// Token metadata for supported stablecoins
+const TOKEN_METADATA: Record<string, { symbol: string; decimals: number }> = {
+  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': { symbol: 'USDC', decimals: 6 },
+  '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06': { symbol: 'USDT', decimals: 6 },
+  '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6': { symbol: 'DAI', decimals: 18 },
+};
+
+/**
+ * Get token decimals for a given token address
+ * Defaults to 18 decimals if not found
+ */
+function getTokenDecimals(tokenAddress: string): number {
+  const normalized = tokenAddress.toLowerCase();
+  for (const [addr, meta] of Object.entries(TOKEN_METADATA)) {
+    if (addr.toLowerCase() === normalized) {
+      return meta.decimals;
+    }
+  }
+  return 18; // Default to 18 decimals
+}
 
 /**
  * Retry an async operation with exponential backoff.
@@ -108,6 +132,9 @@ const ERC20_WITH_PERMIT_ABI = [
 
 export type ProgressCallback = (progress: TransferProgress) => void;
 
+/**
+ * Legacy single-recipient transfer params (backward compat)
+ */
 interface TransferParams {
   senderWalletID: string;
   senderEncryptionKey: string;
@@ -123,6 +150,43 @@ interface TransferParams {
   eip7702Auth?: EIP7702Authorization;
   
   onProgress?: ProgressCallback;
+}
+
+/**
+ * Batch transfer params supporting multiple recipients and tokens
+ */
+interface BatchTransferParams {
+  senderWalletID: string;
+  senderEncryptionKey: string;
+  senderRailgunAddress: string;
+  userAddress: string;
+  
+  // Multiple recipients (can have different tokens)
+  recipients: TransferRecipientInput[];
+  
+  // Per-token permits (keyed by token address)
+  permits: Record<string, PermitData>;
+  
+  // Gas abstraction
+  gasAbstraction: GasAbstractionMethod;
+  eip7702Auth?: EIP7702Authorization;
+  
+  onProgress?: ProgressCallback;
+}
+
+/**
+ * Batch transfer result
+ */
+interface BatchTransferResult {
+  success: boolean;
+  shieldResults?: TokenShieldResult[];
+  unshieldTxHash?: string;
+  recipientResults?: RecipientUnshieldResult[];
+  senderRailgunAddress?: string;
+  error?: string;
+  
+  // Legacy single-transfer fields
+  shieldTxHash?: string;
 }
 
 class RailgunTransferService {
@@ -552,6 +616,523 @@ class RailgunTransferService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Execute a batch transfer with multiple recipients and potentially multiple tokens.
+   * 
+   * Flow:
+   * 1. Group recipients by token
+   * 2. Execute permit per token (if needed)
+   * 3. TransferFrom user to relayer for each token
+   * 4. Shield each token separately (one TX per token)
+   * 5. Wait for POI on all tokens
+   * 6. Generate single ZK proof covering all recipients
+   * 7. Single unshield TX to all recipients
+   */
+  async executeBatchTransfer(params: BatchTransferParams): Promise<BatchTransferResult> {
+    const {
+      senderWalletID,
+      senderEncryptionKey: clientEncryptionKey,
+      senderRailgunAddress,
+      userAddress,
+      recipients,
+      permits,
+      gasAbstraction,
+      eip7702Auth,
+      onProgress,
+    } = params;
+
+    const progress = (
+      step: TransferStep, 
+      pct: number, 
+      message: string, 
+      txHash?: string,
+      tokenInfo?: { current: number; total: number; address: string },
+      recipientInfo?: { current: number; total: number }
+    ) => {
+      console.log(`[BatchTransfer] ${step}: ${message} (${pct}%)`);
+      onProgress?.({ 
+        step, 
+        progress: pct, 
+        message, 
+        txHash,
+        currentTokenIndex: tokenInfo?.current,
+        totalTokens: tokenInfo?.total,
+        currentToken: tokenInfo?.address,
+        currentRecipientIndex: recipientInfo?.current,
+        totalRecipients: recipientInfo?.total,
+      });
+    };
+
+    const shieldResults: TokenShieldResult[] = [];
+    const recipientResults: RecipientUnshieldResult[] = recipients.map(r => ({
+      address: r.address,
+      tokenAddress: r.tokenAddress,
+      amount: r.amount,
+      status: 'pending' as const,
+    }));
+
+    try {
+      if (!railgunEngine.isReady()) {
+        throw new Error("RAILGUN engine not initialized");
+      }
+
+      if (!relayerService.isConfigured()) {
+        throw new Error("Relayer not configured. Add RELAYER_PRIVATE_KEY to .env.local");
+      }
+
+      // Get server-cached encryption key
+      const cachedWallet = railgunWallet.getCachedWalletByID(senderWalletID);
+      const senderEncryptionKey = cachedWallet?.encryptionKey || clientEncryptionKey;
+
+      // Verify wallet exists
+      let abstractWallet = walletForID(senderWalletID);
+      if (!abstractWallet) {
+        console.log('[BatchTransfer] Wallet not found in engine, attempting to load...');
+        try {
+          await loadWalletByID(senderEncryptionKey, senderWalletID, false);
+          abstractWallet = walletForID(senderWalletID);
+        } catch (loadError) {
+          throw new Error(`Wallet ${senderWalletID} not found and could not be loaded.`);
+        }
+      }
+
+      const networkName = railgunEngine.getNetwork();
+      const txidVersion = railgunEngine.getTxidVersion();
+      const { chain } = RAILGUN_NETWORK_CONFIG[networkName];
+
+      const relayerWallet = relayerService.getWallet();
+      const provider = relayerService.getProvider();
+      const relayerAddress = relayerWallet.address;
+
+      console.log('[BatchTransfer] === BATCH GASLESS TRANSFER STARTED ===');
+      console.log('[BatchTransfer] Recipients:', recipients.length);
+      console.log('[BatchTransfer] Gas abstraction:', gasAbstraction);
+      console.log('[BatchTransfer] Relayer:', relayerAddress);
+
+      // ════════════════════════════════════════════════════════════════
+      // STEP 1: Group recipients by token
+      // ════════════════════════════════════════════════════════════════
+      progress('preparing', 5, `Grouping ${recipients.length} recipients by token...`);
+
+      const tokenGroups: Record<string, { recipients: TransferRecipientInput[]; total: bigint }> = {};
+      for (const recipient of recipients) {
+        if (!tokenGroups[recipient.tokenAddress]) {
+          tokenGroups[recipient.tokenAddress] = { recipients: [], total: BigInt(0) };
+        }
+        tokenGroups[recipient.tokenAddress].recipients.push(recipient);
+        tokenGroups[recipient.tokenAddress].total += BigInt(recipient.amount);
+      }
+
+      const tokenAddresses = Object.keys(tokenGroups);
+      console.log('[BatchTransfer] Unique tokens:', tokenAddresses.length);
+
+      // ════════════════════════════════════════════════════════════════
+      // STEP 2: Execute permits and pull tokens for each token type
+      // ════════════════════════════════════════════════════════════════
+      for (let i = 0; i < tokenAddresses.length; i++) {
+        const tokenAddress = tokenAddresses[i];
+        const { total: amount } = tokenGroups[tokenAddress];
+        const permitData = permits[tokenAddress];
+
+        const tokenContract = new Contract(tokenAddress, ERC20_WITH_PERMIT_ABI, relayerWallet);
+
+        progress(
+          'approving', 
+          10 + Math.floor((i / tokenAddresses.length) * 5),
+          `Processing token ${i + 1}/${tokenAddresses.length}...`,
+          undefined,
+          { current: i, total: tokenAddresses.length, address: tokenAddress }
+        );
+
+        // Execute permit if provided
+        if (gasAbstraction === 'permit' && permitData) {
+          await this.executePermit(tokenContract, permitData);
+          console.log(`[BatchTransfer] Permit executed for token ${tokenAddress}`);
+        } else if (gasAbstraction === 'eip7702' && eip7702Auth) {
+          throw new Error('EIP-7702 support coming soon - use permit for now');
+        }
+
+        // Verify allowance
+        const userAllowance = await tokenContract.allowance(userAddress, relayerAddress);
+        const tokenDecimals = getTokenDecimals(tokenAddress);
+        if (userAllowance < amount) {
+          throw new Error(
+            `Insufficient allowance for token ${tokenAddress}. Have: ${ethers.formatUnits(userAllowance, tokenDecimals)}, Need: ${ethers.formatUnits(amount, tokenDecimals)}`
+          );
+        }
+
+        // Pull tokens from user
+        const transferFromTx = await tokenContract.transferFrom(
+          userAddress,
+          relayerAddress,
+          amount,
+          { gasLimit: 100000 }
+        );
+        await transferFromTx.wait();
+        console.log(`[BatchTransfer] Pulled ${ethers.formatUnits(amount, tokenDecimals)} of token ${tokenAddress}`);
+
+        // Approve RAILGUN proxy if needed
+        const relayerAllowance = await tokenContract.allowance(relayerAddress, RAILGUN_PROXY);
+        if (relayerAllowance < amount) {
+          const approveTx = await tokenContract.approve(RAILGUN_PROXY, ethers.MaxUint256);
+          await approveTx.wait();
+        }
+      }
+
+      // ════════════════════════════════════════════════════════════════
+      // STEP 3: Shield each token separately
+      // ════════════════════════════════════════════════════════════════
+      const shieldSignatureMessage = getShieldPrivateKeySignatureMessage();
+      const shieldPrivateKey = keccak256(toUtf8Bytes(shieldSignatureMessage));
+      const feeData = await provider.getFeeData();
+
+      for (let i = 0; i < tokenAddresses.length; i++) {
+        const tokenAddress = tokenAddresses[i];
+        const { total: amount } = tokenGroups[tokenAddress];
+
+        progress(
+          'shielding_token',
+          20 + Math.floor((i / tokenAddresses.length) * 15),
+          `Shielding token ${i + 1}/${tokenAddresses.length}...`,
+          undefined,
+          { current: i, total: tokenAddresses.length, address: tokenAddress }
+        );
+
+        const shieldRecipients: RailgunERC20AmountRecipient[] = [{
+          tokenAddress,
+          amount,
+          recipientAddress: senderRailgunAddress,
+        }];
+
+        const { gasEstimate: shieldGasEstimate } = await gasEstimateForShield(
+          txidVersion,
+          networkName,
+          shieldPrivateKey,
+          shieldRecipients,
+          [],
+          relayerAddress
+        );
+
+        const shieldGasDetails: TransactionGasDetails = {
+          evmGasType: EVMGasType.Type2,
+          gasEstimate: shieldGasEstimate,
+          maxFeePerGas: feeData.maxFeePerGas ?? BigInt(50 * 10 ** 9),
+          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? BigInt(2 * 10 ** 9),
+        };
+
+        const { transaction: shieldTx } = await populateShield(
+          txidVersion,
+          networkName,
+          shieldPrivateKey,
+          shieldRecipients,
+          [],
+          shieldGasDetails
+        );
+
+        const shieldTxResponse = await relayerWallet.sendTransaction(shieldTx);
+        console.log(`[BatchTransfer] Shield TX for ${tokenAddress}:`, shieldTxResponse.hash);
+
+        await shieldTxResponse.wait();
+
+        shieldResults.push({
+          tokenAddress,
+          amount: amount.toString(),
+          shieldTxHash: shieldTxResponse.hash,
+          status: 'confirmed',
+        });
+      }
+
+      // ════════════════════════════════════════════════════════════════
+      // STEP 4: Wait for POI on all tokens
+      // ════════════════════════════════════════════════════════════════
+      progress('waiting_poi', 40, 'Waiting for Proof of Innocence verification on all tokens...');
+
+      const SHIELD_FEE_BASIS_POINTS = BigInt(25); // 0.25%
+      const maxWaitTimePerToken = 120000; // 120 seconds per token
+      const pollInterval = 5000;
+      const overallStartTime = Date.now();
+
+      // Wait for spendable balance on each token
+      // Each token gets its own timeout to avoid race conditions
+      for (let tokenIdx = 0; tokenIdx < tokenAddresses.length; tokenIdx++) {
+        const tokenAddress = tokenAddresses[tokenIdx];
+        const { total: originalAmount } = tokenGroups[tokenAddress];
+        const minExpectedBalance = (originalAmount * BigInt(99)) / BigInt(100);
+        
+        let spendableBalance = BigInt(0);
+        const tokenStartTime = Date.now(); // Fresh start time for each token
+        
+        while (spendableBalance < minExpectedBalance && Date.now() - tokenStartTime < maxWaitTimePerToken) {
+          await new Promise(r => setTimeout(r, pollInterval));
+          await refreshBalances(chain, [senderWalletID]);
+          
+          const wallet = walletForID(senderWalletID);
+          spendableBalance = await balanceForERC20Token(
+            txidVersion,
+            wallet,
+            networkName,
+            tokenAddress,
+            true
+          );
+
+          const elapsed = Math.floor((Date.now() - overallStartTime) / 1000);
+          const tokenProgress = 40 + ((tokenIdx / tokenAddresses.length) * 10) + Math.min((Date.now() - tokenStartTime) / maxWaitTimePerToken * 5, 5);
+          progress('waiting_poi', Math.floor(tokenProgress), `POI verification... ${elapsed}s elapsed (token ${tokenIdx + 1}/${tokenAddresses.length})`);
+        }
+
+        if (spendableBalance < minExpectedBalance) {
+          throw new Error(`POI timeout for token ${tokenAddress}`);
+        }
+        
+        console.log(`[BatchTransfer] POI verified for ${tokenAddress}`);
+      }
+
+      // ════════════════════════════════════════════════════════════════
+      // STEP 5 & 6: Generate ZK proofs and unshield to each recipient
+      // RAILGUN SDK limitation: only one recipient per token per TX
+      // So we process each recipient individually
+      // ════════════════════════════════════════════════════════════════
+      progress('generating_proof', 55, `Generating ZK proofs for ${recipients.length} recipients...`);
+
+      const originalGasDetails: TransactionGasDetails = {
+        evmGasType: EVMGasType.Type2,
+        gasEstimate: BigInt(0),
+        maxFeePerGas: feeData.maxFeePerGas ?? BigInt(50 * 10 ** 9),
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? BigInt(2 * 10 ** 9),
+      };
+
+      let lastUnshieldTxHash: string | undefined;
+
+      // Process each recipient individually
+      for (let i = 0; i < recipients.length; i++) {
+        const recipient = recipients[i];
+        const originalAmount = BigInt(recipient.amount);
+        const shieldFee = (originalAmount * SHIELD_FEE_BASIS_POINTS) / BigInt(10000);
+        const unshieldAmount = originalAmount - shieldFee;
+
+        const recipientProgressBase = 55 + (i / recipients.length) * 40;
+        progress(
+          'generating_proof', 
+          Math.floor(recipientProgressBase), 
+          `Processing recipient ${i + 1}/${recipients.length}...`,
+          undefined,
+          undefined,
+          { current: i, total: recipients.length }
+        );
+
+        // Build single-recipient unshield array
+        const unshieldRecipients: RailgunERC20AmountRecipient[] = [{
+          tokenAddress: recipient.tokenAddress,
+          amount: unshieldAmount,
+          recipientAddress: recipient.address,
+        }];
+
+        // Gas estimation for this recipient
+        const { gasEstimate: unshieldGasEstimate } = await withRetry(
+          () => gasEstimateForUnprovenUnshield(
+            txidVersion,
+            networkName,
+            senderWalletID,
+            senderEncryptionKey,
+            unshieldRecipients,
+            [],
+            originalGasDetails,
+            undefined,
+            true
+          ),
+          `Gas estimation for recipient ${i + 1}`,
+          3,
+          3000,
+          (attempt, max) => {
+            progress('generating_proof', Math.floor(recipientProgressBase), `Retrying gas estimation (attempt ${attempt + 1}/${max})...`);
+          }
+        );
+
+        const unshieldGasDetails: TransactionGasDetails = {
+          evmGasType: EVMGasType.Type2,
+          gasEstimate: unshieldGasEstimate,
+          maxFeePerGas: feeData.maxFeePerGas ?? BigInt(50 * 10 ** 9),
+          maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? BigInt(2 * 10 ** 9),
+        };
+
+        const overallBatchMinGasPrice = calculateGasPrice(unshieldGasDetails);
+
+        // Generate ZK proof for this recipient
+        await withRetry(
+          () => generateUnshieldProof(
+            txidVersion,
+            networkName,
+            senderWalletID,
+            senderEncryptionKey,
+            unshieldRecipients,
+            [],
+            undefined,
+            true,
+            overallBatchMinGasPrice,
+            (proofProgress) => {
+              const pct = recipientProgressBase + (proofProgress / 100) * 15;
+              progress('generating_proof', Math.floor(pct), `ZK proof ${i + 1}/${recipients.length}... ${proofProgress}%`);
+            }
+          ),
+          `ZK proof for recipient ${i + 1}`,
+          3,
+          5000,
+          (attempt, max) => {
+            progress('generating_proof', Math.floor(recipientProgressBase), `Retrying proof (attempt ${attempt + 1}/${max})...`);
+          }
+        );
+
+        console.log(`[BatchTransfer] ZK proof generated for recipient ${i + 1}/${recipients.length}`);
+
+        // Unshield to this recipient
+        progress('unshielding', Math.floor(recipientProgressBase + 15), `Unshielding to recipient ${i + 1}/${recipients.length}...`);
+
+        const { transaction: unshieldTx } = await withRetry(
+          () => populateProvedUnshield(
+            txidVersion,
+            networkName,
+            senderWalletID,
+            unshieldRecipients,
+            [],
+            undefined,
+            true,
+            overallBatchMinGasPrice,
+            unshieldGasDetails
+          ),
+          `Populate unshield for recipient ${i + 1}`,
+          3,
+          2000
+        );
+
+        const unshieldTxResponse = await relayerWallet.sendTransaction(unshieldTx);
+        console.log(`[BatchTransfer] Unshield TX for recipient ${i + 1}:`, unshieldTxResponse.hash);
+
+        await unshieldTxResponse.wait();
+        lastUnshieldTxHash = unshieldTxResponse.hash;
+
+        // Update recipient result
+        recipientResults[i].status = 'complete';
+        recipientResults[i].unshieldTxHash = unshieldTxResponse.hash;
+
+        console.log(`[BatchTransfer] Recipient ${i + 1}/${recipients.length} complete`);
+
+        // CRITICAL: After each unshield, we need to wait for the SDK to recognize
+        // the change notes before processing the next recipient. The unshield TX
+        // creates new notes for remaining balance, but they need to be indexed.
+        if (i < recipients.length - 1) {
+          console.log(`[BatchTransfer] Waiting for balance update before next recipient...`);
+          
+          // Calculate expected remaining balance for next recipients
+          let remainingRequired = BigInt(0);
+          for (let j = i + 1; j < recipients.length; j++) {
+            const nextRecipient = recipients[j];
+            if (nextRecipient.tokenAddress.toLowerCase() === recipient.tokenAddress.toLowerCase()) {
+              remainingRequired += BigInt(nextRecipient.amount);
+            }
+          }
+
+          if (remainingRequired > 0) {
+            const balanceWaitStart = Date.now();
+            const maxBalanceWait = 30000; // 30 seconds max wait
+            const balancePollInterval = 2000;
+            let currentBalance = BigInt(0);
+            
+            // Account for shield fee on remaining amount
+            const minExpectedBalance = (remainingRequired * BigInt(99)) / BigInt(100);
+
+            while (currentBalance < minExpectedBalance && Date.now() - balanceWaitStart < maxBalanceWait) {
+              await refreshBalances(chain, [senderWalletID]);
+              await new Promise(r => setTimeout(r, balancePollInterval));
+              
+              const wallet = walletForID(senderWalletID);
+              currentBalance = await balanceForERC20Token(
+                txidVersion,
+                wallet,
+                networkName,
+                recipient.tokenAddress,
+                true // spendable only
+              );
+              
+              const elapsed = Math.floor((Date.now() - balanceWaitStart) / 1000);
+              console.log(`[BatchTransfer] Balance check: ${currentBalance.toString()} / ${minExpectedBalance.toString()} (${elapsed}s)`);
+              
+              progress(
+                'generating_proof',
+                Math.floor(recipientProgressBase + 18),
+                `Syncing balance... ${elapsed}s`,
+                undefined,
+                undefined,
+                { current: i, total: recipients.length }
+              );
+            }
+
+            if (currentBalance < minExpectedBalance) {
+              console.warn(`[BatchTransfer] Balance sync incomplete. Have: ${currentBalance.toString()}, Need: ${minExpectedBalance.toString()}`);
+              // Continue anyway - the SDK might still have enough from change notes
+            } else {
+              console.log(`[BatchTransfer] Balance synced successfully for next recipient`);
+            }
+          } else {
+            // No more recipients for this token, just do a quick refresh
+            await refreshBalances(chain, [senderWalletID]);
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
+      }
+
+      // ════════════════════════════════════════════════════════════════
+      // COMPLETE
+      // ════════════════════════════════════════════════════════════════
+      progress('complete', 100, `Batch transfer complete! ${recipients.length} recipients`, lastUnshieldTxHash);
+      console.log('[BatchTransfer] === BATCH GASLESS TRANSFER COMPLETE ===');
+      console.log('[BatchTransfer] Recipients:', recipients.length);
+      console.log('[BatchTransfer] Tokens:', tokenAddresses.length);
+      console.log('[BatchTransfer] Last unshield TX:', lastUnshieldTxHash);
+
+      return {
+        success: true,
+        shieldResults,
+        unshieldTxHash: lastUnshieldTxHash,
+        recipientResults,
+        senderRailgunAddress,
+        // Legacy compat - first shield TX
+        shieldTxHash: shieldResults[0]?.shieldTxHash,
+      };
+
+    } catch (error) {
+      console.error('[BatchTransfer] Failed:', error);
+      
+      // Create user-friendly error message
+      let userMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Handle specific error cases with friendlier messages
+      if (userMessage.includes('spendable private balance too low')) {
+        userMessage = 'Balance sync failed. The RAILGUN network may be congested. Please try again in a few minutes.';
+      } else if (userMessage.includes('Note already spent')) {
+        userMessage = 'Transaction conflict detected. Please wait a moment and try again.';
+      } else if (userMessage.includes('POI timeout')) {
+        userMessage = 'Privacy verification timed out. The network may be slow. Please try again.';
+      }
+      
+      progress('error', 0, userMessage);
+
+      // Mark incomplete recipients as errored (keep completed ones)
+      for (const result of recipientResults) {
+        if (result.status !== 'complete') {
+          result.status = 'error';
+          result.error = userMessage;
+        }
+      }
+
+      return {
+        success: false,
+        shieldResults,
+        recipientResults,
+        error: userMessage,
       };
     }
   }

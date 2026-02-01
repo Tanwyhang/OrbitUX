@@ -7,9 +7,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "dev:extension": "vite build --mode development --watch",
+    "build:extension": "vite build",
+    "preview:extension": "vite build && echo 'Load extension-dist in Chrome at chrome://extensions'"
   },
   "dependencies": {
+    "@metamask/sdk": "^0.34.0",
     "@railgun-community/shared-models": "^8.0.0",
     "@railgun-community/wallet": "^10.8.1",
     "@rainbow-me/rainbowkit": "^2.2.10",
@@ -17,6 +21,7 @@
     "@react-three/fiber": "^9.5.0",
     "@tanstack/react-query": "^5.90.20",
     "@web3icons/react": "^4.1.16",
+    "@zkp2p/sdk": "^0.0.10",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
     "ethers": "^6.16.0",
@@ -30,21 +35,25 @@
     "snarkjs": "^0.7.6",
     "tailwind-merge": "^3.4.0",
     "three": "^0.182.0",
-    "viem": "2.x",
+    "viem": "^2.45.1",
     "wagmi": "^3.4.1"
   },
   "devDependencies": {
+    "@crxjs/vite-plugin": "^2.3.0",
     "@types/leveldown": "^4.0.6",
     "@types/node": "^20.11.30",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@types/snarkjs": "^0.7.9",
+    "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.0",
     "eslint-config-next": "15.1.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.19",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vite": "^7.3.1",
+    "vite-plugin-node-polyfills": "^0.25.0"
   },
   "engines": {
     "node": ">=18.18.0"

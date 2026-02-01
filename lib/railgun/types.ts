@@ -73,7 +73,19 @@ export interface PermitData {
   s: string;
 }
 
-export interface TransferRequest {
+/**
+ * Single recipient input for batch transfers
+ */
+export interface TransferRecipientInput {
+  address: string; // Public 0x address
+  amount: string; // In base units (e.g., "1000000" for 1 USDC)
+  tokenAddress: string; // ERC20 token address
+}
+
+/**
+ * Legacy single-recipient transfer request (backward compatible)
+ */
+export interface TransferRequestLegacy {
   senderWalletID: string;
   senderEncryptionKey: string;
   senderRailgunAddress: string; // 0zk... address
@@ -88,10 +100,45 @@ export interface TransferRequest {
   permitData?: PermitData; // Required if gasAbstraction === 'permit'
 }
 
+/**
+ * Batch transfer request supporting multiple recipients and tokens
+ * 
+ * Flow:
+ * 1. User signs permits (one per unique token)
+ * 2. Shield phase (one TX per unique token)
+ * 3. Wait for POI (all tokens)
+ * 4. Generate ZK proof (single proof covering all recipients)
+ * 5. Unshield TX (single TX to all recipients)
+ */
+export interface TransferRequest {
+  senderWalletID: string;
+  senderEncryptionKey: string;
+  senderRailgunAddress: string; // 0zk... address
+  userAddress: string; // User's public wallet address
+  
+  // Multi-recipient support
+  recipients: TransferRecipientInput[];
+  
+  // Per-token permits (keyed by token address)
+  // Each unique token needs its own permit signature
+  permits: Record<string, PermitData>;
+  
+  // Gas abstraction method (applies to all transfers)
+  gasAbstraction: GasAbstractionMethod;
+  eip7702Auth?: EIP7702Authorization; // Required if gasAbstraction === 'eip7702'
+  
+  // Legacy single-recipient fields (backward compatibility)
+  recipientAddress?: string;
+  tokenAddress?: string;
+  amount?: string;
+  permitData?: PermitData;
+}
+
 export type TransferStep = 
   | 'preparing'
   | 'approving'
-  | 'shielding'
+  | 'shielding'       // Shielding tokens (per-token)
+  | 'shielding_token' // Currently shielding specific token
   | 'waiting_poi'
   | 'generating_proof'
   | 'transferring'
@@ -104,12 +151,58 @@ export interface TransferProgress {
   progress: number; // 0-100
   message: string;
   txHash?: string;
+  
+  // Multi-token progress
+  currentTokenIndex?: number;
+  totalTokens?: number;
+  currentToken?: string; // Token address being processed
+  
+  // Multi-recipient progress
+  currentRecipientIndex?: number;
+  totalRecipients?: number;
 }
 
+/**
+ * Per-token shield result
+ */
+export interface TokenShieldResult {
+  tokenAddress: string;
+  amount: string; // Total amount shielded for this token
+  shieldTxHash: string;
+  status: 'pending' | 'confirmed' | 'error';
+  error?: string;
+}
+
+/**
+ * Per-recipient unshield result
+ */
+export interface RecipientUnshieldResult {
+  address: string;
+  tokenAddress: string;
+  amount: string;
+  status: 'pending' | 'complete' | 'error';
+  unshieldTxHash?: string;
+  error?: string;
+}
+
+/**
+ * Batch transfer response
+ */
 export interface TransferResponse {
   success: boolean;
-  shieldTxHash?: string;
+  
+  // Per-token shield transactions (one per unique token)
+  shieldResults?: TokenShieldResult[];
+  
+  // Single unshield TX for all recipients
   unshieldTxHash?: string;
+  
+  // Per-recipient results
+  recipientResults?: RecipientUnshieldResult[];
+  
   senderRailgunAddress?: string;
   error?: string;
+  
+  // Legacy single-transfer fields (backward compat)
+  shieldTxHash?: string;
 }

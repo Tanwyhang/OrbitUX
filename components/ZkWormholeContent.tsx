@@ -13,8 +13,7 @@ import { usePrivateTransfer, type TransferRecipient } from '@/hooks/usePrivateTr
 import { usePublicTransfer, type PublicTransferRecipient } from '@/hooks/usePublicTransfer'
 import { useStealthMode } from './contexts/StealthModeContext'
 import WalletSetup from './WalletSetup'
-import TransactionProgress from './TransactionProgress'
-import TransactionResult from './TransactionResult'
+import PrivacyFlowUI from './PrivacyFlowUI'
 import { PublicTransactionProgress, PublicTransactionResult } from './PublicTransactionUI'
 import type { Stablecoin } from '@/app/api/railgun/stablecoins/route'
 
@@ -448,11 +447,18 @@ export default function ZkWormholeContent() {
       </AnimatePresence>
 
       {/* Progress Modal - different for stealth vs public mode */}
-      <AnimatePresence>
-        {isTransferring && stealthMode && (
-          <TransactionProgress progress={privateProgress} />
-        )}
-      </AnimatePresence>
+      {/* Private (stealth) mode uses unified PrivacyFlowUI */}
+      <PrivacyFlowUI
+        isVisible={(isPrivateTransferring || (showResult && stealthMode && !!privateResult))}
+        isTransferring={isPrivateTransferring}
+        progress={privateProgress}
+        result={privateResult}
+        senderAddress={connectedAddress || ''}
+        recipients={recipients.map(r => ({ address: r.address, amount: r.amount, token: r.token }))}
+        totalAmount={getTotalAmount().toString()}
+        token={recipients[0]?.token || 'USDC'}
+        onClose={handleCloseResult}
+      />
 
       <AnimatePresence>
         {isTransferring && !stealthMode && (
@@ -460,13 +466,7 @@ export default function ZkWormholeContent() {
         )}
       </AnimatePresence>
 
-      {/* Result Modal - different for stealth vs public mode */}
-      <AnimatePresence>
-        {showResult && stealthMode && privateResult && (
-          <TransactionResult result={privateResult} onClose={handleCloseResult} />
-        )}
-      </AnimatePresence>
-
+      {/* Result Modal - only for public mode (stealth mode handled by PrivacyFlowUI) */}
       <AnimatePresence>
         {showResult && !stealthMode && publicResult && (
           <PublicTransactionResult result={publicResult} onClose={handleCloseResult} />

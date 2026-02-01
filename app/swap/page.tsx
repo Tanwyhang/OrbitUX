@@ -1,10 +1,10 @@
 import MainAppLayout from '@/components/MainAppLayout'
-import SwapContent from '@/components/SwapContent'
+import CrossChainSwapContent from '@/components/CrossChainSwapContent'
 
 export default function SwapPage() {
   return (
     <MainAppLayout>
-      <SwapContent />
+      <CrossChainSwapContent />
     </MainAppLayout>
   )
 }

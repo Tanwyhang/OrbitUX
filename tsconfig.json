@@ -39,6 +39,9 @@
     "node_modules",
     "my-video",
     "railgun-integration",
-    "scripts"
+    "scripts",
+    "extension",
+    "dist/extension",
+    "vite.config.ts"
   ]
 }

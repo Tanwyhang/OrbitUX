@@ -6,30 +6,70 @@ import { parseUnits, erc20Abi, type Address, type Hex } from 'viem';
 import { useRailgunWallet } from './useRailgunWallet';
 import { useRailgunEngine } from './useRailgunEngine';
 import { TOKENS, EXPLORER_URL, RELAYER_ADDRESS } from '@/lib/wagmi';
-import type { GasAbstractionMethod, PermitData } from '@/lib/railgun/types';
+import type { GasAbstractionMethod, PermitData, TransferRecipientInput, TokenShieldResult } from '@/lib/railgun/types';
+
+// Token metadata for supported stablecoins
+// This should match the stablecoins API response
+const TOKEN_METADATA: Record<string, { symbol: string; name: string; decimals: number; version?: string }> = {
+  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': { symbol: 'USDC', name: 'USDC', decimals: 6, version: '2' },
+  '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06': { symbol: 'USDT', name: 'TetherToken', decimals: 6, version: '1' },
+  '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6': { symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18, version: '1' },
+};
+
+// Token symbol to address mapping - must match TOKEN_METADATA above
+const TOKEN_ADDRESSES: Record<string, string> = {
+  USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+  USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06',
+  DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6',
+};
+
+/**
+ * Get token address from symbol
+ * Falls back to USDC if symbol not found
+ */
+function getTokenAddress(symbol: string): string {
+  return TOKEN_ADDRESSES[symbol.toUpperCase()] || TOKEN_ADDRESSES.USDC;
+}
+
+/**
+ * Get token decimals for a given token address
+ * Defaults to 18 decimals if not found
+ */
+function getTokenDecimals(tokenAddress: string): number {
+  const normalized = tokenAddress.toLowerCase();
+  for (const [addr, meta] of Object.entries(TOKEN_METADATA)) {
+    if (addr.toLowerCase() === normalized) {
+      return meta.decimals;
+    }
+  }
+  return 18; // Default to 18 decimals
+}
 
 /**
  * Private Transfer Hook with Full Gas Abstraction
  * 
  * Implements the full private transfer flow via API with ZERO gas cost to user:
  * 
- * 1. User signs a gasless permit (EIP-2612) OR EIP-7702 authorization
- * 2. Relayer calls permit() on-chain (paying gas) to get approval
- * 3. Shield (sender public → sender private) - relayer pays gas
+ * Supports multi-token batch transfers:
+ * 1. User signs permits (one per unique token, gasless EIP-2612)
+ * 2. Relayer executes permits on-chain (paying gas)
+ * 3. Shield each token separately (one TX per token) - relayer pays gas
  * 4. Wait for POI verification (~60s)
- * 5. Generate ZK proof
- * 6. Unshield (sender private → recipient public) - relayer pays gas
+ * 5. Generate single ZK proof for all recipients
+ * 6. Single unshield TX to all recipients - relayer pays gas
  * 
- * From the user's perspective: Sign once, transfer happens privately.
+ * From the user's perspective: Sign N permits (one per token), transfer happens privately.
  * User pays ZERO gas - relayer sponsors everything.
  */
 
 export type TransferStep = 
   | 'idle'
   | 'preparing'
-  | 'signing'      // User signing permit/authorization
-  | 'approving'    // Relayer executing permit on-chain
+  | 'signing'         // User signing permit/authorization
+  | 'signing_token'   // Signing permit for specific token
+  | 'approving'       // Relayer executing permit on-chain
   | 'shielding'
+  | 'shielding_token' // Shielding specific token
   | 'waiting_poi'
   | 'generating_proof'
   | 'transferring'
@@ -42,23 +82,46 @@ export interface TransferProgress {
   progress: number; // 0-100
   message: string;
   details?: string;
+  // Batch transfer info
+  currentRecipientIndex?: number;
+  totalRecipients?: number;
+  recipients?: TransferRecipient[];
+  // Multi-token info
+  currentTokenIndex?: number;
+  totalTokens?: number;
+  currentToken?: string;
+  // Per-token shield results
+  shieldResults?: TokenShieldResult[];
+  // ZK proof generation progress (0-100) for current recipient
+  zkProofProgress?: number;
 }
 
 export interface TransferRecipient {
   address: string; // 0x... public address
   amount: string; // Human readable amount
   token?: string; // Token symbol (e.g., 'USDC', 'USDT', 'DAI')
+  // Populated after transfer
+  shieldTxHash?: string;
+  unshieldTxHash?: string;
+  status?: 'pending' | 'processing' | 'complete' | 'error';
+  error?: string;
 }
 
 export interface TransferResult {
   success: boolean;
+  // For single transfers (backward compat)
   shieldTxHash?: string;
   unshieldTxHash?: string;
+  // For batch transfers
+  recipients: TransferRecipient[];
+  // For multi-token transfers
+  shieldResults?: TokenShieldResult[];
   // For privacy comparison display
   senderInfo: {
     publicAddress: string;
     railgunAddress: string;
   };
+  // Legacy single recipient (backward compat)
   recipientInfo: {
     publicAddress: string;
   };
@@ -81,8 +144,10 @@ const STEP_MESSAGES: Record<TransferStep, string> = {
   idle: 'Ready to transfer',
   preparing: 'Preparing transfer...',
   signing: 'Please sign the approval message...',
+  signing_token: 'Sign approval for token...',
   approving: 'Relayer processing approval...',
   shielding: 'Shielding tokens to private balance...',
+  shielding_token: 'Shielding token...',
   waiting_poi: 'Waiting for Proof of Innocence verification...',
   generating_proof: 'Generating ZK Proof...',
   transferring: 'Executing private transfer...',
@@ -126,7 +191,14 @@ export function usePrivateTransfer() {
     result: null,
   });
 
-  const updateProgress = useCallback((step: TransferStep, progress: number, details?: string) => {
+  const updateProgress = useCallback((
+    step: TransferStep, 
+    progress: number, 
+    details?: string,
+    recipientInfo?: { currentIndex?: number; total?: number; recipients?: TransferRecipient[] },
+    tokenInfo?: { currentIndex?: number; total?: number; currentToken?: string },
+    shieldResults?: TokenShieldResult[]
+  ) => {
     setState(prev => ({
       ...prev,
       progress: {
@@ -134,26 +206,54 @@ export function usePrivateTransfer() {
         progress,
         message: STEP_MESSAGES[step],
         details,
+        currentRecipientIndex: recipientInfo?.currentIndex,
+        totalRecipients: recipientInfo?.total,
+        recipients: recipientInfo?.recipients,
+        currentTokenIndex: tokenInfo?.currentIndex,
+        totalTokens: tokenInfo?.total,
+        currentToken: tokenInfo?.currentToken,
+        shieldResults,
       },
     }));
   }, []);
 
   /**
-   * Get USDC permit domain for Sepolia
+   * Get permit domain for a token
+   * Each EIP-2612 token has its own domain with specific name/version
    */
-  const getUSDCDomain = useCallback(() => {
+  const getTokenDomain = useCallback((tokenAddress: string) => {
+    const normalized = tokenAddress.toLowerCase();
+    
+    // Look up token metadata for proper domain values
+    for (const [addr, meta] of Object.entries(TOKEN_METADATA)) {
+      if (addr.toLowerCase() === normalized) {
+        return {
+          name: meta.name,
+          version: meta.version || '1',
+          chainId: 11155111, // Sepolia
+          verifyingContract: tokenAddress as Address,
+        };
+      }
+    }
+    
+    // Fallback for unknown tokens - this may fail if domain doesn't match
+    console.warn(`[PrivateTransfer] Unknown token ${tokenAddress}, using default permit domain`);
     return {
-      name: 'USDC',
-      version: '2',
+      name: 'Token',
+      version: '1',
       chainId: 11155111, // Sepolia
-      verifyingContract: TOKENS.USDC as Address,
+      verifyingContract: tokenAddress as Address,
     };
   }, []);
 
   /**
    * Sign an EIP-2612 permit for gasless approval
+   * @param tokenAddress - The token to sign permit for
+   * @param amount - Amount to approve
+   * @param deadline - Permit expiration timestamp
    */
   const signPermit = useCallback(async (
+    tokenAddress: string,
     amount: bigint,
     deadline: bigint
   ): Promise<PermitData> => {
@@ -163,13 +263,13 @@ export function usePrivateTransfer() {
 
     // Get current nonce for user
     const nonce = await publicClient.readContract({
-      address: TOKENS.USDC as Address,
+      address: tokenAddress as Address,
       abi: NONCES_ABI,
       functionName: 'nonces',
       args: [senderAddress],
     });
 
-    const domain = getUSDCDomain();
+    const domain = getTokenDomain(tokenAddress);
 
     const message = {
       owner: senderAddress,
@@ -202,7 +302,7 @@ export function usePrivateTransfer() {
       r,
       s,
     };
-  }, [walletClient, senderAddress, publicClient, getUSDCDomain]);
+  }, [walletClient, senderAddress, publicClient, getTokenDomain]);
 
   /**
    * Check if user already has sufficient allowance
@@ -223,9 +323,15 @@ export function usePrivateTransfer() {
     return allowance >= amount;
   }, [publicClient, senderAddress]);
 
+  /**
+   * Execute a private transfer supporting multiple recipients and tokens.
+   * 
+   * @param recipients - Array of recipients, each with address, amount, and optional token
+   * @param defaultTokenAddress - Default token for recipients without explicit token
+   */
   const executePrivateTransfer = useCallback(async (
     recipients: TransferRecipient[],
-    tokenAddress: string = TOKENS.USDC
+    defaultTokenAddress: string = TOKENS.USDC
   ): Promise<TransferResult> => {
     if (!senderAddress || !wallet) {
       throw new Error('Wallet not connected or RAILGUN wallet not initialized');
@@ -237,56 +343,144 @@ export function usePrivateTransfer() {
 
     setState(prev => ({ ...prev, isTransferring: true, result: null }));
     
-    const totalAmount = recipients.reduce((sum, r) => sum + parseFloat(r.amount || '0'), 0);
-    const amountBigInt = parseUnits(totalAmount.toString(), 6); // USDC has 6 decimals
+    // Normalize recipients - ensure each has a token address
+    // Resolve tokenAddress from token symbol using our mapping
+    const normalizedRecipients = recipients.map(r => {
+      const tokenSymbol = r.token || 'USDC';
+      const explicitTokenAddress = (r as unknown as { tokenAddress?: string }).tokenAddress;
+      // Use explicit tokenAddress if provided, otherwise resolve from symbol
+      const tokenAddress = explicitTokenAddress || getTokenAddress(tokenSymbol);
+      return {
+        ...r,
+        token: tokenSymbol,
+        tokenAddress,
+      };
+    });
+    
+    // Track recipients with status
+    const trackedRecipients: TransferRecipient[] = normalizedRecipients.map(r => ({
+      ...r,
+      status: 'pending' as const,
+    }));
+    
+    const recipientInfo = { 
+      currentIndex: 0, 
+      total: recipients.length, 
+      recipients: trackedRecipients 
+    };
 
     try {
       // Ensure engine is initialized
-      updateProgress('preparing', 5, 'Initializing RAILGUN engine...');
+      updateProgress('preparing', 5, 'Initializing RAILGUN engine...', recipientInfo);
       
       if (engineStatus !== 'ready') {
         await initEngine();
       }
 
-      updateProgress('preparing', 10, 'Preparing transfer request...');
+      updateProgress('preparing', 10, 'Analyzing transfer...', recipientInfo);
 
       // ════════════════════════════════════════════════════════════════
-      // STEP 1: Determine gas abstraction method
+      // STEP 1: Group recipients by token and calculate totals
+      // ════════════════════════════════════════════════════════════════
+      const tokenGroups: Record<string, { 
+        recipients: typeof normalizedRecipients; 
+        total: bigint;
+        symbol: string;
+        decimals: number;
+      }> = {};
+
+      for (const recipient of normalizedRecipients) {
+        const tokenAddr = recipient.tokenAddress;
+        if (!tokenGroups[tokenAddr]) {
+          tokenGroups[tokenAddr] = { 
+            recipients: [], 
+            total: BigInt(0),
+            symbol: recipient.token || 'TOKEN',
+            decimals: getTokenDecimals(tokenAddr),
+          };
+        }
+        tokenGroups[tokenAddr].recipients.push(recipient);
+        // Parse amount using correct decimals for this token
+        const decimals = tokenGroups[tokenAddr].decimals;
+        const amountBigInt = parseUnits(recipient.amount || '0', decimals);
+        tokenGroups[tokenAddr].total += amountBigInt;
+      }
+
+      const tokenAddresses = Object.keys(tokenGroups);
+      const tokenInfo = { currentIndex: 0, total: tokenAddresses.length, currentToken: '' };
+
+      console.log('[PrivateTransfer] Token groups:', tokenAddresses.length);
+      for (const [addr, group] of Object.entries(tokenGroups)) {
+        console.log(`  ${group.symbol}: ${group.recipients.length} recipients, total: ${group.total.toString()}`);
+      }
+
+      // ════════════════════════════════════════════════════════════════
+      // STEP 2: Check allowances and sign permits per token
       // ════════════════════════════════════════════════════════════════
       let gasAbstraction: GasAbstractionMethod = 'permit';
-      let permitData: PermitData | undefined;
+      const permits: Record<string, PermitData> = {};
+      let allHaveAllowance = true;
 
-      // Check if already approved
-      const hasAllowance = await checkAllowance(amountBigInt, tokenAddress);
-      
-      if (hasAllowance) {
-        console.log('[PrivateTransfer] Already has sufficient allowance');
-        gasAbstraction = 'approved';
-      } else {
-        // Request gasless permit signature
-        updateProgress('signing', 15, 'Please sign the approval message (no gas required)...');
+      for (let i = 0; i < tokenAddresses.length; i++) {
+        const tokenAddress = tokenAddresses[i];
+        const { total: amount, symbol } = tokenGroups[tokenAddress];
+
+        tokenInfo.currentIndex = i;
+        tokenInfo.currentToken = tokenAddress;
+
+        // Check if already approved
+        const hasAllowance = await checkAllowance(amount, tokenAddress);
         
-        // Permit expires in 1 hour
-        const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-        
-        try {
-          permitData = await signPermit(amountBigInt, deadline);
-          console.log('[PrivateTransfer] Permit signed successfully');
-          gasAbstraction = 'permit';
-        } catch (signError) {
-          console.error('[PrivateTransfer] Permit signing failed:', signError);
-          throw new Error('Signature rejected. Please sign the approval to continue.');
+        if (hasAllowance) {
+          console.log(`[PrivateTransfer] Already has allowance for ${symbol}`);
+        } else {
+          allHaveAllowance = false;
+          
+          // Request gasless permit signature
+          updateProgress(
+            'signing_token', 
+            10 + Math.floor((i / tokenAddresses.length) * 10),
+            `Sign approval for ${symbol} (${i + 1}/${tokenAddresses.length})...`,
+            recipientInfo,
+            tokenInfo
+          );
+          
+          // Permit expires in 1 hour
+          const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+          
+          try {
+            permits[tokenAddress] = await signPermit(tokenAddress, amount, deadline);
+            console.log(`[PrivateTransfer] Permit signed for ${symbol}`);
+          } catch (signError) {
+            console.error(`[PrivateTransfer] Permit signing failed for ${symbol}:`, signError);
+            throw new Error(`Signature rejected for ${symbol}. Please sign all approvals to continue.`);
+          }
         }
       }
 
-      updateProgress('approving', 20, 'Relayer processing approval (no gas for you!)...');
+      if (allHaveAllowance) {
+        gasAbstraction = 'approved';
+      }
+
+      updateProgress('approving', 25, 'Sending to relayer...', recipientInfo, tokenInfo);
 
       // ════════════════════════════════════════════════════════════════
-      // STEP 2: Call transfer API with permit data
-      // Relayer will call permit() on-chain, then transferFrom(), then RAILGUN
+      // STEP 3: Build API request with batch format
       // ════════════════════════════════════════════════════════════════
-      updateProgress('shielding', 30, 'Starting private transfer (this may take 2-3 minutes)...');
+      const apiRecipients: TransferRecipientInput[] = normalizedRecipients.map(r => {
+        const decimals = getTokenDecimals(r.tokenAddress);
+        return {
+          address: r.address,
+          tokenAddress: r.tokenAddress,
+          amount: parseUnits(r.amount || '0', decimals).toString(),
+        };
+      });
 
+      updateProgress('shielding', 30, `Shielding ${tokenAddresses.length} token(s)...`, recipientInfo, tokenInfo);
+
+      // ════════════════════════════════════════════════════════════════
+      // STEP 4: Call API with SSE streaming for real-time progress
+      // ════════════════════════════════════════════════════════════════
       const response = await fetch('/api/railgun/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -294,67 +488,215 @@ export function usePrivateTransfer() {
           senderWalletID: wallet.walletID,
           senderEncryptionKey: wallet.encryptionKey,
           senderRailgunAddress: wallet.railgunAddress,
-          recipientAddress: recipients[0].address,
-          tokenAddress,
-          amount: amountBigInt.toString(),
           userAddress: senderAddress,
+          recipients: apiRecipients,
+          permits,
           gasAbstraction,
-          permitData,
         }),
       });
 
-      // Show progress updates while waiting
-      updateProgress('shielding', 35, 'Shielding tokens...');
-      
-      // Wait a bit then update to POI step
-      await new Promise(r => setTimeout(r, 3000));
-      updateProgress('waiting_poi', 45, 'Waiting for POI verification (~60 seconds)...');
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Transfer failed');
+      if (!response.ok) {
+        // Non-streaming error response
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Transfer failed');
       }
 
-      updateProgress('complete', 100, 'Transfer complete!');
+      // Check if we got a streaming response
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType?.includes('text/event-stream') && response.body) {
+        // ═══════════════════════════════════════════════════════════
+        // SSE Streaming: Parse real-time progress updates
+        // ═══════════════════════════════════════════════════════════
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalData: {
+          success: boolean;
+          shieldResults?: TokenShieldResult[];
+          unshieldTxHash?: string;
+          recipientResults?: Array<{
+            address: string;
+            amount: string;
+            status: string;
+            unshieldTxHash?: string;
+            error?: string;
+          }>;
+          senderRailgunAddress?: string;
+          shieldTxHash?: string;
+          error?: string;
+        } | null = null;
 
-      const result: TransferResult = {
-        success: true,
-        shieldTxHash: data.shieldTxHash,
-        unshieldTxHash: data.unshieldTxHash,
-        senderInfo: {
-          publicAddress: senderAddress,
-          railgunAddress: data.senderRailgunAddress || wallet.railgunAddress,
-        },
-        recipientInfo: {
-          publicAddress: recipients[0].address,
-        },
-        privacyProof: {
-          shieldTxLink: `${EXPLORER_URL}/tx/${data.shieldTxHash}`,
-          unshieldTxLink: `${EXPLORER_URL}/tx/${data.unshieldTxHash}`,
-          explanation: 
-            `🎉 ZERO GAS TRANSFER COMPLETE!\n\n` +
-            `You paid NO gas fees - the relayer sponsored everything.\n\n` +
-            `Your transfer used two separate transactions that cannot be linked on-chain:\n\n` +
-            `1. Shield TX (${data.shieldTxHash?.slice(0, 10)}...): Your tokens entered RAILGUN's private pool. ` +
-            `Observers see the RELAYER sending to the RAILGUN contract.\n\n` +
-            `2. Unshield TX (${data.unshieldTxHash?.slice(0, 10)}...): Tokens exited to the recipient. ` +
-            `Observers see the RAILGUN contract sending to the RECIPIENT.\n\n` +
-            `There is NO on-chain link between your address (${senderAddress.slice(0, 10)}...) ` +
-            `and the recipient (${recipients[0].address.slice(0, 10)}...). ` +
-            `The ZK proof ensures the transfer is valid without revealing the connection.`,
-        },
-      };
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-      setState(prev => ({ ...prev, isTransferring: false, result }));
-      return result;
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Parse SSE events (format: "data: {...}\n\n")
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            
+            try {
+              const eventData = JSON.parse(line.slice(6)); // Remove "data: " prefix
+              
+              if (eventData.type === 'progress') {
+                // Real-time progress update from server
+                const progress = eventData.data;
+                setState(prev => ({
+                  ...prev,
+                  progress: {
+                    step: progress.step,
+                    progress: progress.progress,
+                    message: progress.message,
+                    currentRecipientIndex: progress.currentRecipient?.current,
+                    totalRecipients: progress.currentRecipient?.total,
+                    currentTokenIndex: progress.currentToken?.current,
+                    totalTokens: progress.currentToken?.total,
+                    currentToken: progress.currentToken?.address,
+                    shieldResults: progress.shieldResults,
+                    recipients: recipients, // Pass actual recipients array
+                  },
+                }));
+              } else if (eventData.type === 'complete') {
+                finalData = eventData.data;
+              } else if (eventData.type === 'error') {
+                finalData = eventData.data;
+              }
+            } catch (parseError) {
+              console.warn('[PrivateTransfer] Failed to parse SSE event:', line);
+            }
+          }
+        }
+
+        if (!finalData) {
+          throw new Error('Transfer failed: no final response received');
+        }
+
+        if (!finalData.success) {
+          throw new Error(finalData.error || 'Transfer failed');
+        }
+
+        // Build completed recipients list with per-recipient results
+        const completedRecipients: TransferRecipient[] = recipients.map((r, idx) => {
+          const recipientResult = finalData!.recipientResults?.[idx];
+          const tokenAddr = normalizedRecipients[idx]?.tokenAddress || defaultTokenAddress;
+          const shieldResult = finalData!.shieldResults?.find((s: TokenShieldResult) => s.tokenAddress === tokenAddr);
+          
+          return {
+            ...r,
+            shieldTxHash: shieldResult?.shieldTxHash || finalData!.shieldTxHash,
+            unshieldTxHash: recipientResult?.unshieldTxHash || finalData!.unshieldTxHash,
+            status: (recipientResult?.status as 'pending' | 'processing' | 'complete' | 'error') || 'complete',
+            error: recipientResult?.error,
+          };
+        });
+
+        updateProgress('complete', 100, `Transfer complete! ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}`, recipientInfo, tokenInfo, finalData.shieldResults);
+
+        const result: TransferResult = {
+          success: true,
+          shieldTxHash: finalData.shieldTxHash,
+          unshieldTxHash: finalData.unshieldTxHash,
+          recipients: completedRecipients,
+          shieldResults: finalData.shieldResults,
+          senderInfo: {
+            publicAddress: senderAddress,
+            railgunAddress: finalData.senderRailgunAddress || wallet.railgunAddress,
+          },
+          recipientInfo: {
+            publicAddress: recipients[0].address,
+          },
+          privacyProof: {
+            shieldTxLink: `${EXPLORER_URL}/tx/${finalData.shieldTxHash}`,
+            unshieldTxLink: `${EXPLORER_URL}/tx/${finalData.unshieldTxHash}`,
+            explanation: tokenAddresses.length > 1
+              ? `Multi-token batch transfer to ${recipients.length} recipients completed privately.`
+              : recipients.length > 1
+              ? `Batch transfer to ${recipients.length} recipients completed privately.`
+              : `Private transfer completed.`,
+          },
+        };
+
+        setState(prev => ({ ...prev, isTransferring: false, result }));
+        return result;
+
+      } else {
+        // ═══════════════════════════════════════════════════════════
+        // Fallback: Non-streaming JSON response (legacy)
+        // ═══════════════════════════════════════════════════════════
+        updateProgress('shielding', 35, 'Shielding tokens...', recipientInfo, tokenInfo);
+        await new Promise(r => setTimeout(r, 3000));
+        updateProgress('waiting_poi', 45, 'Waiting for POI verification (~60 seconds)...', recipientInfo, tokenInfo);
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Transfer failed');
+        }
+
+        updateProgress('complete', 100, `Transfer complete! ${recipients.length} recipient${recipients.length > 1 ? 's' : ''}`, recipientInfo, tokenInfo, data.shieldResults);
+
+        // Build completed recipients list with per-recipient results
+        const completedRecipients: TransferRecipient[] = recipients.map((r, idx) => {
+          const recipientResult = data.recipientResults?.[idx];
+          const tokenAddr = normalizedRecipients[idx]?.tokenAddress || defaultTokenAddress;
+          const shieldResult = data.shieldResults?.find((s: TokenShieldResult) => s.tokenAddress === tokenAddr);
+          
+          return {
+            ...r,
+            shieldTxHash: shieldResult?.shieldTxHash || data.shieldTxHash,
+            unshieldTxHash: recipientResult?.unshieldTxHash || data.unshieldTxHash,
+            status: recipientResult?.status || 'complete',
+            error: recipientResult?.error,
+          };
+        });
+
+        const result: TransferResult = {
+          success: true,
+          shieldTxHash: data.shieldTxHash,
+          unshieldTxHash: data.unshieldTxHash,
+          recipients: completedRecipients,
+          shieldResults: data.shieldResults,
+          senderInfo: {
+            publicAddress: senderAddress,
+            railgunAddress: data.senderRailgunAddress || wallet.railgunAddress,
+          },
+          recipientInfo: {
+            publicAddress: recipients[0].address,
+          },
+          privacyProof: {
+            shieldTxLink: `${EXPLORER_URL}/tx/${data.shieldTxHash}`,
+            unshieldTxLink: `${EXPLORER_URL}/tx/${data.unshieldTxHash}`,
+            explanation: tokenAddresses.length > 1
+              ? `Multi-token batch transfer to ${recipients.length} recipients completed privately.`
+              : recipients.length > 1
+              ? `Batch transfer to ${recipients.length} recipients completed privately.`
+              : `Private transfer completed.`,
+          },
+        };
+
+        setState(prev => ({ ...prev, isTransferring: false, result }));
+        return result;
+      }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Transfer failed';
       updateProgress('error', 0, errorMessage);
       
+      // Build failed recipients list
+      const failedRecipients: TransferRecipient[] = recipients.map(r => ({
+        ...r,
+        status: 'error' as const,
+        error: errorMessage,
+      }));
+
       const result: TransferResult = {
         success: false,
+        recipients: failedRecipients,
         senderInfo: {
           publicAddress: senderAddress,
           railgunAddress: wallet.railgunAddress,

@@ -7,15 +7,15 @@ export default function Navigation() {
   const pathname = usePathname()
 
   const tabs = [
-    { name: 'Swap', href: '/app/swap' },
-    { name: 'zkWormhole', href: '/app/zkWormhole' },
-    { name: 'Card', href: '/app/card' }
+    { name: 'Card', href: '/card' },
+    { name: 'Swap', href: '/swap' },
+    { name: 'zkWormhole', href: '/zkWormhole' }
   ]
 
   return (
     <nav className="sticky top-0 z-50 w-full backdrop-blur-3xl bg-black/50 border-b border-white/10">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <Link href="/app/swap" className="flex items-center gap-2">
+        <Link href="/swap" className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[hsl(var(--ring))] to-[hsl(var(--accent))] flex items-center justify-center">
             <span className="text-sm font-bold text-black">O</span>
           </div>
