@@ -7,7 +7,7 @@ import { X, ChevronRight } from 'lucide-react'
 
 const speedrampEasing: Easing = [0.16, 1, 0.3, 1]
 import { useZkp2pOnramp } from '@/hooks/useZkp2pOnramp'
-// import { useZkp2pOfframp } from '@/hooks/useZkp2pOfframp'
+import { useZkp2pOfframp } from '@/hooks/useZkp2pOfframp'
 
 type Token = 'ETH' | 'USDC' | 'DAI' | 'USDT' | 'EURC' | 'WBTC' | 'LINK' | 'UNI' | 'OP' | 'BNB' | 'MATIC' | 'ARB'
 
