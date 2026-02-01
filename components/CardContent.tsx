@@ -16,12 +16,11 @@ export default function CardContent() {
   const handleAddFunds = async () => {
     try {
       await openOnramp({
-        // Polygon: 137:0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359
-        toToken: '137:0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+        // Base: 8453:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+        toToken: '8453:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
         paymentPlatform: 'wise',
-        inputAmount: 10,
-        // You can optionally specify recipient address
-        // recipientAddress: '0x...',
+        inputAmount: 2,
+        recipientAddress: '0x40cCB8B947839a1c68F77632FA34e7930B352B61',
       })
     } catch (err) {
       // Error is handled by the hook, but we can add additional handling here
@@ -70,32 +69,27 @@ export default function CardContent() {
               onClick={() => setFlipped(!flipped)}
             >
               <div className="absolute inset-0 backface-hidden">
-                  <div className="relative h-full w-full rounded-2xl bg-gradient-to-br from-[hsl(var(--pink))] via-gray-200 to-white p-6 shadow-2xl">                  <div className="h-full flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-white">Orbit</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-black/60">PRIVATE</div>
-                        <div className="text-lg font-bold text-black">$24,567.89</div>
-                      </div>
-                    </div>
+                <div className="relative h-full w-full rounded-2xl p-6 shadow-2xl" style={{ background: 'radial-gradient(circle at center, white 10%, #ffd6e0 100%)' }}>
+                  {/* Card Chip - Middle Left */}
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2">
+                    <svg width="50" height="40" viewBox="0 0 50 40">
+                      <rect width="50" height="40" rx="4" fill="#D4AF37" />
+                      <rect x="5" y="5" width="12" height="12" rx="2" fill="#F4D03F" />
+                      <rect x="33" y="5" width="12" height="12" rx="2" fill="#F4D03F" />
+                      <rect x="5" y="23" width="12" height="12" rx="2" fill="#F4D03F" />
+                      <rect x="19" y="14" width="12" height="12" rx="2" fill="#F4D03F" />
+                      <rect x="33" y="23" width="12" height="12" rx="2" fill="#F4D03F" />
+                    </svg>
+                  </div>
 
-                    <div className="text-black">
-                      <div className="text-xs text-black/60 mb-1">Card Number</div>
-                      <div className="text-xl font-bold">•••• •••• •••• 4582</div>
-                    </div>
+                  {/* Orbit Logo - Center */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <img src="/orbit-transparent.png" alt="Orbit" width={140} height={140} className="object-contain" />
+                  </div>
 
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xs text-black/60 mb-1">Balance</div>
-                        <div className="text-lg font-bold text-black">1.2345 ETH</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-black/60 mb-1">Valid Thru</div>
-                        <div className="text-sm font-semibold text-black">12/28</div>
-                      </div>
-                    </div>
+                  {/* ZKP2P Logo - Right Bottom */}
+                  <div className="absolute right-6 bottom-6">
+                    <img src="/zkp2p.svg" alt="ZKP2P" width={40} height={40} className="object-contain" />
                   </div>
                 </div>
               </div>
@@ -104,22 +98,40 @@ export default function CardContent() {
                 className="absolute inset-0 backface-hidden"
                 style={{ transform: 'rotateY(180deg)' }}
               >
-                <div className="relative h-full w-full rounded-2xl bg-white">
-                  <div className="absolute top-6 left-6">
-                    <svg width="40" height="30" viewBox="0 0 40 30">
-                      <rect width="40" height="30" rx="3" fill="#D4AF37" />
-                      <rect x="5" y="5" width="8" height="8" rx="1" fill="#F4D03F" />
-                      <rect x="27" y="5" width="8" height="8" rx="1" fill="#F4D03F" />
-                      <rect x="5" y="17" width="8" height="8" rx="1" fill="#F4D03F" />
-                      <rect x="16" y="11" width="8" height="8" rx="1" fill="#F4D03F" />
-                      <rect x="27" y="17" width="8" height="8" rx="1" fill="#F4D03F" />
+                <div className="relative h-full w-full rounded-2xl bg-gradient-to-br from-[hsl(var(--pink))] via-gray-200 to-white">
+                  {/* Magnetic Stripe - Thick line (lowered) */}
+                  <div className="absolute top-8 left-0 right-0 h-12 bg-black" />
+
+                  {/* Card Details - Left Bottom */}
+                  <div className="absolute bottom-6 left-6 text-black">
+                    <div className="text-xs text-black/60 mb-1">Card Number</div>
+                    <div className="text-lg font-bold tracking-wider">•••• •••• •••• 4582</div>
+
+                    <div className="mt-3 flex gap-6">
+                      <div>
+                        <div className="text-xs text-black/60 mb-1">Valid Thru</div>
+                        <div className="text-sm font-semibold">12/28</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-black/60 mb-1">CVV</div>
+                        <div className="text-sm font-semibold">•••</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contactless Wave Icon - Right Side */}
+                  <div className="absolute right-6 top-1/2 -translate-y-1/2">
+                    <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                      <path d="M30 30V10M30 50V30" stroke="#333" strokeWidth="3" strokeLinecap="round"/>
+                      <path d="M22 38C18 34 18 26 22 22M38 38C42 34 42 26 38 22M14 44C8 38 8 22 14 16M46 44C52 38 52 22 46 16"
+                            stroke="#333"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeOpacity="0.6"/>
                     </svg>
                   </div>
-                  <div className="h-full flex items-center justify-center">
-                    <img src="/orbit.png" alt="Orbit" width={150} height={150} className="object-contain" />
-                  </div>
-                  </div>
                 </div>
+              </div>
             </div>
             </div>
           </div>
@@ -127,7 +139,7 @@ export default function CardContent() {
         <button
           onClick={handleAddFunds}
           disabled={isOnrampLoading}
-          className="group mx-auto block w-[386px] rounded-xl bg-gradient-to-r from-[hsl(var(--pink))] to-purple-600 px-6 py-4 font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          className="group mx-auto block w-[386px] rounded-xl bg-white border-2 border-[hsl(var(--pink))] px-6 py-4 text-xl font-bold text-[hsl(var(--pink))] hover:bg-[#ffd6e0] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {isOnrampLoading ? 'Opening Onramp...' : 'Add Funds'}
         </button>
@@ -135,7 +147,7 @@ export default function CardContent() {
         <button
           onClick={handleSellToken}
           disabled={isOfframpLoading}
-          className="hidden group mx-auto mt-3 block w-[386px] rounded-xl border border-[hsl(var(--pink))]/10 bg-[hsl(var(--pink))]/10 px-6 py-4 font-semibold text-[hsl(var(--pink))] hover:bg-[hsl(var(--pink))]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          className="hidden group mx-auto mt-3 block w-[386px] rounded-xl bg-[hsl(var(--pink))] border-2 border-[hsl(var(--pink))] px-6 py-4 font-semibold text-white hover:bg-white hover:text-[hsl(var(--pink))] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {isOfframpLoading ? 'Creating Deposit...' : 'Sell Token'}
         </button>
