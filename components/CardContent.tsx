@@ -11,7 +11,7 @@ import { useZkp2pOfframp } from '@/hooks/useZkp2pOfframp'
 export default function CardContent() {
   const [flipped, setFlipped] = useState(false)
   const { openOnramp, isLoading: isOnrampLoading, error: onrampError } = useZkp2pOnramp()
-  const { createDeposit, isLoading: isOfframpLoading, error: offrampError } = useZkp2pOfframp()
+  const { createDeposit, isCreatingDeposit: isOfframpLoading, error: offrampError } = useZkp2pOfframp(null)
 
   const handleAddFunds = async () => {
     try {
@@ -170,7 +170,7 @@ export default function CardContent() {
         {offrampError && (
           <div className="mx-auto mt-4 max-w-[386px] rounded-lg border border-orange-500/30 bg-orange-500/10 p-4 text-sm text-orange-200 whitespace-pre-line">
             <div className="font-semibold mb-2">Offramp Error:</div>
-            {offrampError}
+            {offrampError.message}
             <div className="mt-3 text-xs opacity-80">
               Make sure you have USDC on Base and are connected to the correct network.
             </div>

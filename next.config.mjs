@@ -5,6 +5,7 @@ const nextConfig = {
     '@railgun-community/wallet',
     '@railgun-community/shared-models',
     'leveldown',
+    'memdown',
     'snarkjs',
     'circomlibjs',
     'ffjavascript',

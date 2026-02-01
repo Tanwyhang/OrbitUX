@@ -1,7 +1,6 @@
 'use client'
 
 import { useCreateDeposit, useAddFunds, useRemoveFunds, useWithdrawDeposit } from '@zkp2p/sdk/react'
-import type { PublicClient } from 'viem'
 
 export interface IntentAmountRange {
   min: bigint
@@ -19,31 +18,28 @@ export interface DepositData {
 }
 
 export interface CreateDepositParams {
-  token: string
+  token: `0x${string}`
   amount: bigint
   intentAmountRange: IntentAmountRange
   processorNames: string[]
-  depositData: DepositData[]
+  depositData: { [key: string]: string }[]
   conversionRates: ConversionRate[][]
 }
 
 export interface AddFundsParams {
-  depositHash: string
-  token: string
+  depositId: bigint
   amount: bigint
 }
 
 export interface WithdrawDepositParams {
-  depositHash: string
-  processorIndex: number
-  fulfillmentData: Record<string, string>[]
+  depositId: bigint
 }
 
 export interface UseZkp2pOfframpReturn {
-  createDeposit: (params: CreateDepositParams) => Promise<{ hash: string }>
-  addFunds: (params: AddFundsParams) => Promise<{ hash: string }>
-  removeFunds: (depositHash: string, token: string, amount: bigint) => Promise<{ hash: string }>
-  withdrawDeposit: (params: WithdrawDepositParams) => Promise<{ hash: string }>
+  createDeposit: (params: CreateDepositParams) => Promise<string | null>
+  addFunds: (params: AddFundsParams) => Promise<string | null>
+  removeFunds: (depositId: bigint, amount: bigint) => Promise<string | null>
+  withdrawDeposit: (params: WithdrawDepositParams) => Promise<string | null>
   isCreatingDeposit: boolean
   isAddingFunds: boolean
   isWithdrawing: boolean
@@ -53,40 +49,40 @@ export interface UseZkp2pOfframpReturn {
 /**
  * Hook for ZKP2P offramp functionality
  * Handles creating deposits, adding funds, and withdrawing to fiat via processors like Wise
- * @param client - Viem PublicClient for blockchain interactions
+ * @param client - Zkp2pClient for blockchain interactions
  */
 export function useZkp2pOfframp(
-  client: PublicClient | null
+  client: any
 ): UseZkp2pOfframpReturn {
   const { createDeposit: sdkCreateDeposit, isLoading: isCreatingDeposit, error: createError } = useCreateDeposit({ client })
   const { addFunds: sdkAddFunds, isLoading: isAddingFunds } = useAddFunds({ client })
   const { removeFunds: sdkRemoveFunds } = useRemoveFunds({ client })
   const { withdrawDeposit: sdkWithdrawDeposit, isLoading: isWithdrawing } = useWithdrawDeposit({ client })
 
-  const createDeposit = async (params: CreateDepositParams) => {
+  const createDeposit = async (params: CreateDepositParams): Promise<string | null> => {
     if (!client) {
-      throw new Error('PublicClient not available. Please connect your wallet.')
+      throw new Error('Client not available. Please connect your wallet.')
     }
-    return sdkCreateDeposit(params)
+    return sdkCreateDeposit(params as any)
   }
 
-  const addFunds = async (params: AddFundsParams) => {
+  const addFunds = async (params: AddFundsParams): Promise<string | null> => {
     if (!client) {
-      throw new Error('PublicClient not available. Please connect your wallet.')
+      throw new Error('Client not available. Please connect your wallet.')
     }
     return sdkAddFunds(params)
   }
 
-  const removeFunds = async (depositHash: string, token: string, amount: bigint) => {
+  const removeFunds = async (depositId: bigint, amount: bigint): Promise<string | null> => {
     if (!client) {
-      throw new Error('PublicClient not available. Please connect your wallet.')
+      throw new Error('Client not available. Please connect your wallet.')
     }
-    return sdkRemoveFunds({ depositHash, token, amount })
+    return sdkRemoveFunds({ depositId, amount })
   }
 
-  const withdrawDeposit = async (params: WithdrawDepositParams) => {
+  const withdrawDeposit = async (params: WithdrawDepositParams): Promise<string | null> => {
     if (!client) {
-      throw new Error('PublicClient not available. Please connect your wallet.')
+      throw new Error('Client not available. Please connect your wallet.')
     }
     return sdkWithdrawDeposit(params)
   }
