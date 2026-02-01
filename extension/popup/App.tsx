@@ -41,8 +41,8 @@ const LockScreen: React.FC<{
   return (
     <div style={styles.lockContainer}>
       <div style={styles.lockContent}>
-        <div style={styles.logo}>
-          <img src="/orbit.png" alt="Orbit" width={80} height={80} style={{ objectFit: 'contain' }} />
+      <div style={styles.logo}>
+          <img src="/orbit-black.png" alt="Orbit" width={100} height={100} style={{ objectFit: 'contain' }} />
         </div>
         <h2 style={styles.title}>Orbit Wallet</h2>
         <p style={styles.subtitle}>Enter your password to unlock</p>

@@ -6,10 +6,12 @@ import { TokenETH, TokenUSDC, TokenDAI } from '@web3icons/react'
 
 const speedrampEasing: Easing = [0.16, 1, 0.3, 1]
 import { useZkp2pOnramp } from '@/hooks/useZkp2pOnramp'
+import { useZkp2pOfframp } from '@/hooks/useZkp2pOfframp'
 
 export default function CardContent() {
   const [flipped, setFlipped] = useState(false)
-  const { openOnramp, isLoading, error } = useZkp2pOnramp()
+  const { openOnramp, isLoading: isOnrampLoading, error: onrampError } = useZkp2pOnramp()
+  const { createDeposit, isLoading: isOfframpLoading, error: offrampError } = useZkp2pOfframp()
 
   const handleAddFunds = async () => {
     try {
@@ -24,6 +26,31 @@ export default function CardContent() {
     } catch (err) {
       // Error is handled by the hook, but we can add additional handling here
       console.error('Failed to open onramp:', err)
+    }
+  }
+
+  const handleSellToken = async () => {
+    try {
+      // Create a deposit for offramp (selling tokens for fiat)
+      // This creates a liquidity pool where users can swap tokens for fiat
+      await createDeposit({
+        // USDC on Base (use appropriate address for your chain)
+        token: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
+        amount: BigInt('5000000'), // 5 USDC (6 decimals)
+        intentAmountRange: {
+          min: BigInt('1000000'), // 1 USDC minimum per transaction
+          max: BigInt('5000000'), // 5 USDC maximum per transaction
+        },
+        processorNames: ['wise'], // Only Wise
+        depositData: [
+          { email: 'hoshaomun0479@gmail.com' }, // Your Wise email
+        ],
+        conversionRates: [
+          [{ currency: 'USD', conversionRate: '1000000000001000000' }], // 1.000000000001 (18 decimals)
+        ],
+      })
+    } catch (err) {
+      console.error('Failed to create deposit:', err)
     }
   }
 
@@ -99,16 +126,24 @@ export default function CardContent() {
 
         <button
           onClick={handleAddFunds}
-          disabled={isLoading}
-          className="group mx-auto block w-[386px] rounded-xl border border-white/10 bg-white px-6 py-4 font-semibold text-[hsl(var(--pink))] hover:invert disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          disabled={isOnrampLoading}
+          className="group mx-auto block w-[386px] rounded-xl bg-gradient-to-r from-[hsl(var(--pink))] to-purple-600 px-6 py-4 font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
         >
-          {isLoading ? 'Opening Onramp...' : 'Add Funds'}
+          {isOnrampLoading ? 'Opening Onramp...' : 'Add Funds'}
         </button>
 
-        {error && (
+        <button
+          onClick={handleSellToken}
+          disabled={isOfframpLoading}
+          className="hidden group mx-auto mt-3 block w-[386px] rounded-xl border border-[hsl(var(--pink))]/10 bg-[hsl(var(--pink))]/10 px-6 py-4 font-semibold text-[hsl(var(--pink))] hover:bg-[hsl(var(--pink))]/20 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        >
+          {isOfframpLoading ? 'Creating Deposit...' : 'Sell Token'}
+        </button>
+
+        {onrampError && (
           <div className="mx-auto mt-4 max-w-[386px] rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200 whitespace-pre-line">
             <div className="font-semibold mb-2">Setup Required:</div>
-            {error}
+            {onrampError}
             <a
               href="https://chromewebstore.google.com/detail/peerauth-authenticate-and/ijpgccednehjpeclfcllnjjcmiohdjih"
               target="_blank"
@@ -117,6 +152,16 @@ export default function CardContent() {
             >
               Open Chrome Web Store
             </a>
+          </div>
+        )}
+
+        {offrampError && (
+          <div className="mx-auto mt-4 max-w-[386px] rounded-lg border border-orange-500/30 bg-orange-500/10 p-4 text-sm text-orange-200 whitespace-pre-line">
+            <div className="font-semibold mb-2">Offramp Error:</div>
+            {offrampError}
+            <div className="mt-3 text-xs opacity-80">
+              Make sure you have USDC on Base and are connected to the correct network.
+            </div>
           </div>
         )}
 
@@ -233,4 +278,5 @@ export default function CardContent() {
       </div>
      )
    }
+
 
