@@ -59,11 +59,11 @@ const STEP_MESSAGES: Record<PublicTransferStep, string> = {
   error: 'Transfer failed',
 };
 
-// Token addresses mapping
+// Token addresses mapping - must match SUPPORTED_STABLECOINS in /api/railgun/stablecoins
 const TOKEN_ADDRESSES: Record<string, `0x${string}`> = {
   USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-  USDT: '0xa3750d39Fa8c377a7FB87FD1F2Be4321722E2c58',
-  DAI: '0x68194a729C2450ad26072b3D33ADaCbcef39D574', // Sepolia DAI
+  USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06',
+  DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6',
 };
 
 // Token decimals

@@ -21,9 +21,9 @@ function MainAppLayoutContent({ children }: { children: ReactNode }) {
     : 0.8
 
   const navItems: NavItem[] = [
-    { name: 'Swap', link: '/swap' },
+    { name: 'Card', link: '/card' },
     { name: 'zkWormhole', link: '/zkWormhole' },
-    { name: 'Card', link: '/card' }
+    { name: 'Swap', link: '/swap' }
   ]
 
   return (

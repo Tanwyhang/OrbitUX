@@ -16,6 +16,21 @@ const TOKEN_METADATA: Record<string, { symbol: string; name: string; decimals: n
   '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6': { symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18, version: '1' },
 };
 
+// Token symbol to address mapping - must match TOKEN_METADATA above
+const TOKEN_ADDRESSES: Record<string, string> = {
+  USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+  USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06',
+  DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6',
+};
+
+/**
+ * Get token address from symbol
+ * Falls back to USDC if symbol not found
+ */
+function getTokenAddress(symbol: string): string {
+  return TOKEN_ADDRESSES[symbol.toUpperCase()] || TOKEN_ADDRESSES.USDC;
+}
+
 /**
  * Get token decimals for a given token address
  * Defaults to 18 decimals if not found
@@ -329,11 +344,18 @@ export function usePrivateTransfer() {
     setState(prev => ({ ...prev, isTransferring: true, result: null }));
     
     // Normalize recipients - ensure each has a token address
-    const normalizedRecipients = recipients.map(r => ({
-      ...r,
-      token: r.token || 'USDC',
-      tokenAddress: (r as unknown as { tokenAddress?: string }).tokenAddress || defaultTokenAddress,
-    }));
+    // Resolve tokenAddress from token symbol using our mapping
+    const normalizedRecipients = recipients.map(r => {
+      const tokenSymbol = r.token || 'USDC';
+      const explicitTokenAddress = (r as unknown as { tokenAddress?: string }).tokenAddress;
+      // Use explicit tokenAddress if provided, otherwise resolve from symbol
+      const tokenAddress = explicitTokenAddress || getTokenAddress(tokenSymbol);
+      return {
+        ...r,
+        token: tokenSymbol,
+        tokenAddress,
+      };
+    });
     
     // Track recipients with status
     const trackedRecipients: TransferRecipient[] = normalizedRecipients.map(r => ({
