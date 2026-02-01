@@ -9,7 +9,7 @@ export default function Hero() {
   const router = useRouter()
 
   const handleLaunchApp = () => {
-    router.push('/swap')
+    router.push('/card')
   }
 
   return (
