@@ -6,12 +6,12 @@ import { TokenETH, TokenUSDC, TokenDAI } from '@web3icons/react'
 
 const speedrampEasing: Easing = [0.16, 1, 0.3, 1]
 import { useZkp2pOnramp } from '@/hooks/useZkp2pOnramp'
-import { useZkp2pOfframp } from '@/hooks/useZkp2pOfframp'
+// import { useZkp2pOfframp } from '@/hooks/useZkp2pOfframp'
 
 export default function CardContent() {
   const [flipped, setFlipped] = useState(false)
   const { openOnramp, isLoading: isOnrampLoading, error: onrampError } = useZkp2pOnramp()
-  const { createDeposit, isLoading: isOfframpLoading, error: offrampError } = useZkp2pOfframp()
+  // const { createDeposit, isCreatingDeposit, error: offrampError } = useZkp2pOfframp(null)
 
   const handleAddFunds = async () => {
     try {
@@ -28,30 +28,30 @@ export default function CardContent() {
     }
   }
 
-  const handleSellToken = async () => {
-    try {
-      // Create a deposit for offramp (selling tokens for fiat)
-      // This creates a liquidity pool where users can swap tokens for fiat
-      await createDeposit({
-        // USDC on Base (use appropriate address for your chain)
-        token: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
-        amount: BigInt('5000000'), // 5 USDC (6 decimals)
-        intentAmountRange: {
-          min: BigInt('1000000'), // 1 USDC minimum per transaction
-          max: BigInt('5000000'), // 5 USDC maximum per transaction
-        },
-        processorNames: ['wise'], // Only Wise
-        depositData: [
-          { email: 'hoshaomun0479@gmail.com' }, // Your Wise email
-        ],
-        conversionRates: [
-          [{ currency: 'USD', conversionRate: '1000000000001000000' }], // 1.000000000001 (18 decimals)
-        ],
-      })
-    } catch (err) {
-      console.error('Failed to create deposit:', err)
-    }
-  }
+  // const handleSellToken = async () => {
+  //   try {
+  //     // Create a deposit for offramp (selling tokens for fiat)
+  //     // This creates a liquidity pool where users can swap tokens for fiat
+  //     await createDeposit({
+  //       // USDC on Base (use appropriate address for your chain)
+  //       token: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
+  //       amount: BigInt('5000000'), // 5 USDC (6 decimals)
+  //       intentAmountRange: {
+  //         min: BigInt('1000000'), // 1 USDC minimum per transaction
+  //         max: BigInt('5000000'), // 5 USDC maximum per transaction
+  //       },
+  //       processorNames: ['wise'], // Only Wise
+  //       depositData: [
+  //         { email: 'hoshaomun0479@gmail.com' }, // Your Wise email
+  //       ],
+  //       conversionRates: [
+  //         [{ currency: 'USD', conversionRate: '1000000000001000000' }], // 1.000000000001 (18 decimals)
+  //       ],
+  //     })
+  //   } catch (err) {
+  //     console.error('Failed to create deposit:', err)
+  //   }
+  // }
 
   return (
     <div className="px-6 py-8">
@@ -144,14 +144,6 @@ export default function CardContent() {
           {isOnrampLoading ? 'Opening Onramp...' : 'Add Funds'}
         </button>
 
-        <button
-          onClick={handleSellToken}
-          disabled={isOfframpLoading}
-          className="hidden group mx-auto mt-3 block w-[386px] rounded-xl bg-[hsl(var(--pink))] border-2 border-[hsl(var(--pink))] px-6 py-4 font-semibold text-white hover:bg-white hover:text-[hsl(var(--pink))] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {isOfframpLoading ? 'Creating Deposit...' : 'Sell Token'}
-        </button>
-
         {onrampError && (
           <div className="mx-auto mt-4 max-w-[386px] rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200 whitespace-pre-line">
             <div className="font-semibold mb-2">Setup Required:</div>
@@ -167,15 +159,24 @@ export default function CardContent() {
           </div>
         )}
 
+        {/* Offramp button and error temporarily disabled */}
+        {/* <button
+          onClick={handleSellToken}
+          disabled={isCreatingDeposit}
+          className="hidden group mx-auto mt-3 block w-[386px] rounded-xl bg-[hsl(var(--pink))] border-2 border-[hsl(var(--pink))] px-6 py-4 font-semibold text-white hover:bg-white hover:text-[hsl(var(--pink))] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        >
+          {isCreatingDeposit ? 'Creating Deposit...' : 'Sell Token'}
+        </button>
+
         {offrampError && (
           <div className="mx-auto mt-4 max-w-[386px] rounded-lg border border-orange-500/30 bg-orange-500/10 p-4 text-sm text-orange-200 whitespace-pre-line">
             <div className="font-semibold mb-2">Offramp Error:</div>
-            {offrampError}
+            {offrampError.message}
             <div className="mt-3 text-xs opacity-80">
               Make sure you have USDC on Base and are connected to the correct network.
             </div>
           </div>
-        )}
+        )} */}
 
          <motion.div
            initial={{ opacity: 0, y: 30 }}

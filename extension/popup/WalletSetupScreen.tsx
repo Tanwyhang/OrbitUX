@@ -133,7 +133,7 @@ const WalletSetupScreen: React.FC<WalletSetupScreenProps> = ({
       <div style={styles.container}>
         <div style={styles.content}>
           <div style={styles.logo}>
-            <img src="/orbit.png" alt="Orbit" width={80} height={80} />
+            <img src="/orbit-black.png" alt="Orbit" width={80} height={80} />
           </div>
           <h2 style={styles.title}>Welcome to Orbit</h2>
           <p style={styles.subtitle}>

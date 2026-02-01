@@ -13,13 +13,10 @@ export interface ConversionRate {
   conversionRate: string
 }
 
-export interface DepositData {
-  email?: string
-  [key: string]: string | undefined
-}
+export type DepositData = Record<string, string>
 
 export interface CreateDepositParams {
-  token: string
+  token: `0x${string}`
   amount: bigint
   intentAmountRange: IntentAmountRange
   processorNames: string[]
@@ -28,22 +25,20 @@ export interface CreateDepositParams {
 }
 
 export interface AddFundsParams {
-  depositHash: string
-  token: string
+  depositId: bigint
   amount: bigint
 }
 
 export interface WithdrawDepositParams {
-  depositHash: string
-  processorIndex: number
-  fulfillmentData: Record<string, string>[]
+  depositId: bigint
+  txOverrides?: any
 }
 
 export interface UseZkp2pOfframpReturn {
-  createDeposit: (params: CreateDepositParams) => Promise<{ hash: string }>
-  addFunds: (params: AddFundsParams) => Promise<{ hash: string }>
-  removeFunds: (depositHash: string, token: string, amount: bigint) => Promise<{ hash: string }>
-  withdrawDeposit: (params: WithdrawDepositParams) => Promise<{ hash: string }>
+  createDeposit: (params: CreateDepositParams) => Promise<`0x${string}` | null>
+  addFunds: (params: AddFundsParams) => Promise<`0x${string}` | null>
+  removeFunds: (depositId: bigint, amount: bigint) => Promise<`0x${string}` | null>
+  withdrawDeposit: (params: WithdrawDepositParams) => Promise<`0x${string}` | null>
   isCreatingDeposit: boolean
   isAddingFunds: boolean
   isWithdrawing: boolean
@@ -58,36 +53,38 @@ export interface UseZkp2pOfframpReturn {
 export function useZkp2pOfframp(
   client: PublicClient | null
 ): UseZkp2pOfframpReturn {
-  const { createDeposit: sdkCreateDeposit, isLoading: isCreatingDeposit, error: createError } = useCreateDeposit({ client })
-  const { addFunds: sdkAddFunds, isLoading: isAddingFunds } = useAddFunds({ client })
-  const { removeFunds: sdkRemoveFunds } = useRemoveFunds({ client })
-  const { withdrawDeposit: sdkWithdrawDeposit, isLoading: isWithdrawing } = useWithdrawDeposit({ client })
+  // When client is null, return disabled functions
+  if (!client) {
+    return {
+      createDeposit: async () => { throw new Error('PublicClient not available. Please connect your wallet.') },
+      addFunds: async () => { throw new Error('PublicClient not available. Please connect your wallet.') },
+      removeFunds: async () => { throw new Error('PublicClient not available. Please connect your wallet.') },
+      withdrawDeposit: async () => { throw new Error('PublicClient not available. Please connect your wallet.') },
+      isCreatingDeposit: false,
+      isAddingFunds: false,
+      isWithdrawing: false,
+      error: null,
+    }
+  }
+
+  const { createDeposit: sdkCreateDeposit, isLoading: isCreatingDeposit, error: createError } = useCreateDeposit({ client: client as any })
+  const { addFunds: sdkAddFunds, isLoading: isAddingFunds } = useAddFunds({ client: client as any })
+  const { removeFunds: sdkRemoveFunds } = useRemoveFunds({ client: client as any })
+  const { withdrawDeposit: sdkWithdrawDeposit, isLoading: isWithdrawing } = useWithdrawDeposit({ client: client as any })
 
   const createDeposit = async (params: CreateDepositParams) => {
-    if (!client) {
-      throw new Error('PublicClient not available. Please connect your wallet.')
-    }
     return sdkCreateDeposit(params)
   }
 
   const addFunds = async (params: AddFundsParams) => {
-    if (!client) {
-      throw new Error('PublicClient not available. Please connect your wallet.')
-    }
     return sdkAddFunds(params)
   }
 
-  const removeFunds = async (depositHash: string, token: string, amount: bigint) => {
-    if (!client) {
-      throw new Error('PublicClient not available. Please connect your wallet.')
-    }
-    return sdkRemoveFunds({ depositHash, token, amount })
+  const removeFunds = async (depositId: bigint, amount: bigint) => {
+    return sdkRemoveFunds({ depositId, amount })
   }
 
   const withdrawDeposit = async (params: WithdrawDepositParams) => {
-    if (!client) {
-      throw new Error('PublicClient not available. Please connect your wallet.')
-    }
     return sdkWithdrawDeposit(params)
   }
 
