@@ -94,7 +94,7 @@ export default function CardContent() {
               onClick={() => setFlipped(!flipped)}
             >
               <div className="absolute inset-0 backface-hidden">
-                <div className="relative h-full w-full rounded-2xl p-6 shadow-2xl" style={{ background: 'radial-gradient(circle at center, white 10%, #ffd6e0 100%)' }}>
+                <div className="relative h-full w-full rounded-2xl p-6 shadow-2xl" style={{ background: 'radial-gradient(circle at center, white 30%, hsl(var(--pink)) 100%)' }}>
                   {/* Card Chip - Middle Left */}
                   <div className="absolute left-6 top-1/2 -translate-y-1/2">
                     <svg width="50" height="40" viewBox="0 0 50 40">
@@ -161,7 +161,7 @@ export default function CardContent() {
             </div>
           </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 max-w-[386px] mx-auto">
+        <div className="flex flex-row gap-3 max-w-[386px] mx-auto">
           <button
             onClick={handleAddFunds}
             disabled={isOnrampLoading}
@@ -171,7 +171,7 @@ export default function CardContent() {
           </button>
           <button
             onClick={() => setShowRequestModal(true)}
-            className="flex-1 rounded-xl bg-gradient-to-r from-[hsl(var(--pink))] to-purple-600 border-2 border-[hsl(var(--pink))] px-4 sm:px-6 py-3 sm:py-4 text-lg sm:text-xl font-bold text-white hover:opacity-90 transition-all"
+            className="flex-1 rounded-xl bg-[hsl(var(--pink))]/50 border-2 border-[hsl(var(--pink))] px-4 sm:px-6 py-3 sm:py-4 text-lg sm:text-xl font-bold text-white hover:bg-[hsl(var(--pink))]/75 transition-all"
           >
             Request
           </button>
@@ -347,7 +347,7 @@ export default function CardContent() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="w-full max-w-[400px] h-[97vh] bg-black rounded-2xl border border-white/20 overflow-hidden pointer-events-auto flex flex-col"
+                className="w-full max-w-[400px] h-[97dvh] bg-black rounded-2xl border border-white/20 overflow-hidden pointer-events-auto flex flex-col"
               >
                 {/* Token List View */}
                 {!selectedToken && !showNfcTap ? (

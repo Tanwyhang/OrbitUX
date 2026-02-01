@@ -124,19 +124,15 @@ export default function OfframpPage() {
               <button
                 type="submit"
                 disabled={pin.join('').length !== 6}
-                className={`w-full rounded-xl px-6 py-4 sm:py-5 text-base sm:text-lg font-semibold text-white transition-all ${
+                className={`w-full rounded-xl border-2 px-6 py-4 sm:py-5 text-base sm:text-lg font-semibold transition-all ${
                   pin.join('').length === 6
-                    ? 'bg-gradient-to-r from-[hsl(var(--pink))] to-purple-600 hover:opacity-90'
-                    : 'bg-white/10 cursor-not-allowed opacity-50'
+                    ? 'bg-white border-[hsl(var(--pink))] text-[hsl(var(--pink))] hover:bg-[#ffd6e0]'
+                    : 'bg-white/10 border-white/20 text-white/40 cursor-not-allowed opacity-50'
                 }`}
               >
                 Confirm
               </button>
             </form>
-
-            <p className="mt-6 sm:mt-8 text-sm sm:text-base text-gray-500">
-              Enter 6-digit PIN to authorize transaction
-            </p>
           </div>
         )}
 
@@ -186,7 +182,7 @@ export default function OfframpPage() {
 
             <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4 sm:mb-6 text-center">Sent: 10 USDC</h2>
 
-            <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 w-full">
+            <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 w-full flex justify-center">
               <a
                 href="https://basescan.org/tx/0x9619649297c6d01172b7eadf124061906ef1715ba63e06b5f5da7e0e52fbe438"
                 target="_blank"
@@ -207,7 +203,7 @@ export default function OfframpPage() {
 
             <button
               onClick={() => router.push('/')}
-              className="inline-block rounded-lg bg-gradient-to-r from-[hsl(var(--pink))] to-purple-600 px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-medium text-white hover:opacity-90 transition-all"
+              className="inline-block rounded-lg border-2 border-[hsl(var(--pink))] bg-white px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-bold text-[hsl(var(--pink))] hover:bg-[#ffd6e0] transition-all"
             >
               Back to Home
             </button>
