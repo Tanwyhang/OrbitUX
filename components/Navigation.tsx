@@ -19,7 +19,7 @@ export default function Navigation() {
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[hsl(var(--ring))] to-[hsl(var(--accent))] flex items-center justify-center">
             <span className="text-sm font-bold text-black">O</span>
           </div>
-          <span className="text-lg font-semibold tracking-tight">OrbitUX</span>
+          <span className="text-lg font-semibold tracking-tight relative z-0">OrbitUX</span>
         </Link>
 
         <div className="flex items-center gap-1">

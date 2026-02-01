@@ -85,22 +85,22 @@ export default function OfframpPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black py-12">
-      <div className="w-full max-w-md px-4">
+    <div className="flex min-h-screen items-center justify-center bg-black px-4 py-8 sm:py-12">
+      <div className="w-full max-w-md">
         {/* PIN Entry Step */}
         {step === 'pin' && (
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="mb-16">
-              <div className="mx-auto h-48 w-48 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden">
-                <img src="/orbit-black.png" alt="Orbit" className="h-40 w-40 object-contain" />
+            <div className="mb-12 sm:mb-16">
+              <div className="mx-auto h-40 w-40 sm:h-48 sm:w-48 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden">
+                <img src="/orbit-black.png" alt="Orbit" className="h-32 w-32 sm:h-40 sm:w-40 object-contain" />
               </div>
             </div>
 
-            <h1 className="text-5xl font-bold text-white mb-4">-10 USDC</h1>
-            <p className="text-gray-400 mb-16 text-lg">Enter your PIN to continue</p>
+            <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3 sm:mb-4">-10 USDC</h1>
+            <p className="text-gray-400 mb-12 sm:mb-16 text-base sm:text-lg">Enter your PIN to continue</p>
 
-            <form onSubmit={handlePinSubmit} className="w-full space-y-12">
-              <div className="flex justify-center gap-4">
+            <form onSubmit={handlePinSubmit} className="w-full space-y-10 sm:space-y-12">
+              <div className="flex justify-center gap-2 sm:gap-4">
                 {[0, 1, 2, 3, 4, 5].map((index) => (
                   <input
                     key={index}
@@ -112,7 +112,7 @@ export default function OfframpPage() {
                     onChange={(e) => handlePinChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
                     onClick={() => handleBoxClick(index)}
-                    className={`h-20 w-14 rounded-xl bg-white/5 text-center text-3xl font-bold text-white transition-all cursor-text ${
+                    className={`h-16 sm:h-20 w-12 sm:w-14 rounded-xl bg-white/5 text-center text-2xl sm:text-3xl font-bold text-white transition-all cursor-text ${
                       pin.join('').length === 6
                         ? 'border-2 border-[hsl(var(--pink))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--pink))] focus:ring-offset-2'
                         : 'border-2 border-white/20 focus:border-[hsl(var(--pink))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--pink))] focus:ring-offset-2'
@@ -124,7 +124,7 @@ export default function OfframpPage() {
               <button
                 type="submit"
                 disabled={pin.join('').length !== 6}
-                className={`w-full rounded-xl px-6 py-5 text-lg font-semibold text-white transition-all ${
+                className={`w-full rounded-xl px-6 py-4 sm:py-5 text-base sm:text-lg font-semibold text-white transition-all ${
                   pin.join('').length === 6
                     ? 'bg-gradient-to-r from-[hsl(var(--pink))] to-purple-600 hover:opacity-90'
                     : 'bg-white/10 cursor-not-allowed opacity-50'
@@ -134,7 +134,7 @@ export default function OfframpPage() {
               </button>
             </form>
 
-            <p className="mt-8 text-base text-gray-500">
+            <p className="mt-6 sm:mt-8 text-sm sm:text-base text-gray-500">
               Enter 6-digit PIN to authorize transaction
             </p>
           </div>
@@ -143,8 +143,8 @@ export default function OfframpPage() {
         {/* Loading Step */}
         {step === 'loading' && (
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="mb-16">
-              <div className="relative h-48 w-48 mx-auto">
+            <div className="mb-12 sm:mb-16">
+              <div className="relative h-40 w-40 sm:h-48 sm:w-48 mx-auto">
                 <div className="absolute inset-0 rounded-full border-4 border-white/10"></div>
                 <div
                   className="absolute inset-0 rounded-full border-4 border-t-[hsl(var(--pink))] border-r-transparent border-b-transparent border-l-transparent animate-spin"
@@ -153,8 +153,8 @@ export default function OfframpPage() {
               </div>
             </div>
 
-            <h2 className="text-3xl font-bold text-white mb-3">{loadingMessage}</h2>
-            <p className="text-gray-400 text-lg">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 text-center">{loadingMessage}</h2>
+            <p className="text-gray-400 text-base sm:text-lg text-center">
               Processing Payment...
             </p>
           </div>
@@ -163,15 +163,15 @@ export default function OfframpPage() {
         {/* Success Step */}
         {step === 'success' && (
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="mb-16">
-              <div className="relative h-56 w-56 mx-auto">
+            <div className="mb-12 sm:mb-16">
+              <div className="relative h-48 w-48 sm:h-56 sm:w-56 mx-auto">
                 {/* Pulsing background */}
                 <div className="absolute inset-0 rounded-full bg-green-500/20 animate-ping"></div>
                 <div className="absolute inset-0 rounded-full bg-green-500/10 animate-pulse"></div>
 
                 {/* Green circle with tick */}
                 <div className="absolute inset-3 rounded-full bg-green-500 flex items-center justify-center shadow-2xl shadow-green-500/50">
-                  <svg className="w-28 h-28 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-24 h-24 sm:w-28 sm:h-28 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -184,22 +184,22 @@ export default function OfframpPage() {
               </div>
             </div>
 
-            <h2 className="text-5xl font-bold text-white mb-6">Sent: 10 USDC</h2>
+            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4 sm:mb-6 text-center">Sent: 10 USDC</h2>
 
-            <div className="space-y-4 mb-8">
+            <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 w-full">
               <a
-                href="https://basescan.org/tx/0x7f2e8b9a3c1d4f6e8a2b5c7d9e1f3a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4e6f8"
+                href="https://basescan.org/tx/0x9619649297c6d01172b7eadf124061906ef1715ba63e06b5f5da7e0e52fbe438"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-3 text-base text-gray-400 hover:text-[hsl(var(--pink))] transition-colors group"
+                className="inline-flex items-center gap-2 sm:gap-3 text-sm sm:text-base text-gray-400 hover:text-[hsl(var(--pink))] transition-colors group"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
-                <span className="font-mono text-sm break-all">
-                  0x7f2e...e6f8
+                <span className="font-mono text-xs sm:text-sm break-all">
+                  0x9619...be438
                 </span>
-                <svg className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
@@ -207,7 +207,7 @@ export default function OfframpPage() {
 
             <button
               onClick={() => router.push('/')}
-              className="inline-block rounded-lg bg-gradient-to-r from-[hsl(var(--pink))] to-purple-600 px-8 py-4 text-base font-medium text-white hover:opacity-90 transition-all"
+              className="inline-block rounded-lg bg-gradient-to-r from-[hsl(var(--pink))] to-purple-600 px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base font-medium text-white hover:opacity-90 transition-all"
             >
               Back to Home
             </button>

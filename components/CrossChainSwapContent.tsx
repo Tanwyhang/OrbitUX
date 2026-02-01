@@ -297,14 +297,14 @@ export default function CrossChainSwapContent() {
   }, [showFromTokenDropdown, showToTokenDropdown, showFromChainDropdown, showToChainDropdown]);
 
   return (
-    <div className="px-6 py-8">
+    <div className="px-4 sm:px-6 py-6 sm:py-8">
       <div className="mx-auto max-w-7xl">
         <div className="flex justify-center">
-          <div className="w-full max-w-md rounded-2xl border border-white/20 bg-white/5 backdrop-blur p-6">
+          <div className="w-full max-w-md sm:max-w-lg rounded-2xl border border-white/20 bg-white/5 backdrop-blur p-4 sm:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
               <div>
-                <h3 className="text-lg font-semibold">Cross-Chain Swap</h3>
+                <h3 className="text-base sm:text-lg font-semibold">Cross-Chain Swap</h3>
                 <p className="text-xs text-muted">
                   Swap or transfer across chains
                 </p>
@@ -356,7 +356,7 @@ export default function CrossChainSwapContent() {
                   </span>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 p-4">
+                  <div className="flex items-center gap-2 sm:gap-3 rounded-xl border border-white/10 bg-black/30 p-3 sm:p-4">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -365,20 +365,20 @@ export default function CrossChainSwapContent() {
                         setShowFromChainDropdown(false);
                         setShowToChainDropdown(false);
                       }}
-                      className="h-10 w-10 flex items-center justify-center hover:opacity-80 transition-opacity"
+                      className="h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center hover:opacity-80 transition-opacity flex-shrink-0"
                     >
                       <TokenIcon
                         symbol={fromToken.symbol}
-                        className="h-10 w-10"
+                        className="h-8 w-8 sm:h-10 sm:w-10"
                       />
                     </button>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <input
                         type="number"
                         placeholder="0.00"
                         value={fromAmount}
                         onChange={(e) => setFromAmount(e.target.value)}
-                        className={`w-full bg-transparent text-2xl font-semibold outline-none ${
+                        className={`w-full bg-transparent text-xl sm:text-2xl font-semibold outline-none ${
                           insufficientBalance ? 'text-red-400' : ''
                         }`}
                       />
@@ -416,7 +416,7 @@ export default function CrossChainSwapContent() {
                           <ChainIcon chainId={fromChainId} className="w-5 h-5" />
                         </button>
                         {showFromChainDropdown && (
-                          <div className="absolute top-full right-0 mt-2 rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 z-20 min-w-[180px]">
+                          <div className="absolute top-full right-0 mt-2 rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 z-20 min-w-[160px] sm:min-w-[180px]">
                             {SOURCE_CHAIN_OPTIONS.map((chain) => (
                               <button
                                 key={chain.id}
@@ -526,7 +526,7 @@ export default function CrossChainSwapContent() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 p-4">
+                  <div className="flex items-center gap-2 sm:gap-3 rounded-xl border border-white/10 bg-black/30 p-3 sm:p-4">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -535,12 +535,12 @@ export default function CrossChainSwapContent() {
                         setShowFromChainDropdown(false);
                         setShowToChainDropdown(false);
                       }}
-                      className="h-10 w-10 flex items-center justify-center hover:opacity-80 transition-opacity"
+                      className="h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center hover:opacity-80 transition-opacity flex-shrink-0"
                     >
-                      <TokenIcon symbol={toToken.symbol} className="h-10 w-10" />
+                      <TokenIcon symbol={toToken.symbol} className="h-8 w-8 sm:h-10 sm:w-10" />
                     </button>
-                    <div className="flex-1">
-                      <div className="text-2xl font-semibold text-muted">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xl sm:text-2xl font-semibold text-muted truncate">
                         {isQuoteLoading ? (
                           <span className="animate-pulse">...</span>
                         ) : outputAmount ? (
@@ -577,7 +577,7 @@ export default function CrossChainSwapContent() {
                           <ChainIcon chainId={destChainId} className="w-5 h-5" />
                         </button>
                         {showToChainDropdown && (
-                          <div className="absolute top-full right-0 mt-2 rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 z-20 min-w-[180px]">
+                          <div className="absolute top-full right-0 mt-2 rounded-xl border border-white/10 bg-black/90 backdrop-blur-2xl p-2 space-y-1 z-20 min-w-[160px] sm:min-w-[180px]">
                             {DEST_CHAIN_OPTIONS.map((chain) => (
                               <button
                                 key={chain.id}
@@ -711,15 +711,15 @@ export default function CrossChainSwapContent() {
                   </div>
 
                   {progress.sourceTxHash && (
-                    <div className="flex items-center justify-between text-xs text-muted pt-1 border-t border-white/5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs text-muted pt-1 border-t border-white/5">
                       <span>Source TX:</span>
                       <a
                         href={getExplorerLink(progress.sourceTxHash)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="hover:underline hover:text-white"
+                        className="hover:underline hover:text-white font-mono break-all"
                       >
-                        {progress.sourceTxHash.slice(0, 10)}...
+                        {progress.sourceTxHash.slice(0, 8)}...
                       </a>
                     </div>
                   )}
@@ -786,7 +786,7 @@ export default function CrossChainSwapContent() {
                   onClick={handleSwap}
                   disabled={buttonState.disabled}
                   className={`
-                    w-full rounded-xl px-4 py-4 font-semibold transition-all
+                    w-full rounded-xl px-4 py-3 sm:py-4 text-sm sm:text-base font-semibold transition-all
                     ${
                       buttonState.disabled
                         ? 'bg-white/10 text-muted cursor-not-allowed'
@@ -802,7 +802,7 @@ export default function CrossChainSwapContent() {
                     {({ openConnectModal }) => (
                       <button
                         onClick={openConnectModal}
-                        className="w-full rounded-xl bg-white px-4 py-4 font-semibold text-[hsl(var(--pink))] hover:invert transition-all"
+                        className="w-full rounded-xl bg-white px-4 py-3 sm:py-4 text-sm sm:text-base font-semibold text-[hsl(var(--pink))] hover:invert transition-all"
                       >
                         Connect Wallet
                       </button>
