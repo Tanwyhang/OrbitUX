@@ -1,7 +1,53 @@
 // Swap Screen Component - Cross-chain swap functionality for Orbit Wallet Extension
-import React, { useState, useEffect } from 'react'
+// Duplicated from app/swap/page.tsx (CrossChainSwapContent)
+import React, { useState, useEffect, useCallback } from 'react'
+import { TokenETH, TokenUSDT, TokenEURC, NetworkSepolia, NetworkArbitrumSepolia, NetworkPolygonAmoy } from '@web3icons/react'
 
-// Types
+// ═══════════════════════════════════════════════════════════════
+// TYPES (from lib/swap/types.ts and lib/swap/crossChainTypes.ts)
+// ═══════════════════════════════════════════════════════════════
+
+type TokenSymbol = 'ETH' | 'USDT' | 'EURC'
+type ChainId = number
+type PoolPair = 'ETH_USDT' | 'EURC_USDT' | 'ETH_EURC'
+
+type CrossChainOperationType =
+  | 'swap'              // Same-chain swap
+  | 'transfer'          // Cross-chain transfer (no swap)
+  | 'cross_chain_swap'  // Cross-chain swap (swap + transfer)
+
+interface PoolToken {
+  symbol: TokenSymbol
+  address: `0x${string}`
+  decimals: number
+  name: string
+  color: string
+}
+
+interface CrossChainPool {
+  address: `0x${string}`
+  pair: PoolPair
+  token0: PoolToken
+  token1: PoolToken
+  supportedChains: ChainId[]
+  isCrossChainEnabled: boolean
+}
+
+interface CrossChainQuote {
+  type: CrossChainOperationType
+  tokenIn: PoolToken
+  tokenOut: PoolToken
+  sourceChainId: ChainId
+  destChainId: ChainId
+  amountIn: bigint
+  amountOut: bigint
+  minAmountOut: bigint
+  priceImpact: number
+  feeAmount: bigint
+  feeBps: number
+  pool: CrossChainPool
+}
+
 interface Account {
   address: string
   railgunAddress?: string
@@ -14,211 +60,485 @@ interface SwapScreenProps {
   onBack?: () => void
 }
 
-// Token options (simplified for extension)
-const TOKENS = [
-  { symbol: 'ETH', name: 'Ethereum', decimals: 18 },
-  { symbol: 'USDT', name: 'Tether USD', decimals: 6 },
-  { symbol: 'EURC', name: 'Euro Coin', decimals: 6 },
+// ═══════════════════════════════════════════════════════════════
+// CONFIGURATION (from lib/swap/crossChainConfig.ts)
+// ═══════════════════════════════════════════════════════════════
+
+const CHAIN_IDS = {
+  SEPOLIA: 11155111,
+  ARBITRUM_SEPOLIA: 421614,
+  POLYGON_AMOY: 80002,
+} as const
+
+// ═══════════════════════════════════════════════════════════════
+// ICON MAPPING
+// ═══════════════════════════════════════════════════════════════
+
+const TOKEN_ICONS: Record<TokenSymbol, React.ComponentType<any>> = {
+  ETH: TokenETH,
+  USDT: TokenUSDT,
+  EURC: TokenEURC,
+}
+
+const CHAIN_ICONS: Record<number, React.ComponentType<any>> = {
+  [CHAIN_IDS.SEPOLIA]: NetworkSepolia,
+  [CHAIN_IDS.ARBITRUM_SEPOLIA]: NetworkArbitrumSepolia,
+  [CHAIN_IDS.POLYGON_AMOY]: NetworkPolygonAmoy,
+}
+
+const CHAIN_NAMES: Record<number, string> = {
+  [CHAIN_IDS.SEPOLIA]: 'Sepolia',
+  [CHAIN_IDS.ARBITRUM_SEPOLIA]: 'Arbitrum Sepolia',
+  [CHAIN_IDS.POLYGON_AMOY]: 'Polygon Amoy',
+}
+
+const SUPPORTED_DESTINATION_CHAINS: ChainId[] = [
+  CHAIN_IDS.ARBITRUM_SEPOLIA,
+  CHAIN_IDS.POLYGON_AMOY,
 ]
 
-// Chain options
-const CHAINS = [
-  { id: 'sepolia', name: 'Sepolia (Same Chain)' },
-  { id: 'arbitrum-sepolia', name: 'Arbitrum Sepolia' },
-  { id: 'polygon-amoy', name: 'Polygon Amoy' },
+const CROSS_CHAIN_TOKENS: Record<TokenSymbol, PoolToken> = {
+  ETH: {
+    symbol: 'ETH',
+    address: '0x715f70ef11A65b4c8A7CCAa32E8aAaeE5011F15e',
+    decimals: 18,
+    name: 'Ethereum',
+    color: '#3B82F6',
+  },
+  USDT: {
+    symbol: 'USDT',
+    address: '0xa3750d39Fa8c377a7FB87FD1F2Be4321722E2c58',
+    decimals: 18,
+    name: 'Tether USD',
+    color: '#10B981',
+  },
+  EURC: {
+    symbol: 'EURC',
+    address: '0x326c5d56646A513151c75DFa5923eF6875dE53d5',
+    decimals: 18,
+    name: 'Euro Coin',
+    color: '#60A5FA',
+  },
+}
+
+const CROSS_CHAIN_POOLS: Record<PoolPair, CrossChainPool> = {
+  ETH_USDT: {
+    address: '0x8A691ba5F5385916522917F9064044E994BD2b3e',
+    pair: 'ETH_USDT',
+    token0: CROSS_CHAIN_TOKENS.ETH,
+    token1: CROSS_CHAIN_TOKENS.USDT,
+    supportedChains: [CHAIN_IDS.ARBITRUM_SEPOLIA, CHAIN_IDS.POLYGON_AMOY],
+    isCrossChainEnabled: true,
+  },
+  EURC_USDT: {
+    address: '0xbe48c809Be034B5154dDA847774d6aF45602cB30',
+    pair: 'EURC_USDT',
+    token0: CROSS_CHAIN_TOKENS.EURC,
+    token1: CROSS_CHAIN_TOKENS.USDT,
+    supportedChains: [CHAIN_IDS.ARBITRUM_SEPOLIA, CHAIN_IDS.POLYGON_AMOY],
+    isCrossChainEnabled: true,
+  },
+  ETH_EURC: {
+    address: '0x04eBd4A555beF227E9F3AA4e85cebd58Db20e0b8',
+    pair: 'ETH_EURC',
+    token0: CROSS_CHAIN_TOKENS.ETH,
+    token1: CROSS_CHAIN_TOKENS.EURC,
+    supportedChains: [CHAIN_IDS.ARBITRUM_SEPOLIA, CHAIN_IDS.POLYGON_AMOY],
+    isCrossChainEnabled: true,
+  },
+}
+
+const CROSS_CHAIN_FEES = {
+  SWAP_FEE_BPS: 30,
+  CROSS_CHAIN_TRANSFER_FEE_BPS: 10,
+  CROSS_CHAIN_SWAP_FEE_BPS: 40,
+}
+
+const TOKEN_LIST = Object.values(CROSS_CHAIN_TOKENS)
+
+const SOURCE_CHAIN_OPTIONS = [
+  { id: CHAIN_IDS.SEPOLIA, name: CHAIN_NAMES[CHAIN_IDS.SEPOLIA] },
+  ...SUPPORTED_DESTINATION_CHAINS.map((id) => ({
+    id,
+    name: CHAIN_NAMES[id] || `Chain ${id}`,
+  })),
 ]
+
+const DEST_CHAIN_OPTIONS = [
+  { id: CHAIN_IDS.SEPOLIA, name: CHAIN_NAMES[CHAIN_IDS.SEPOLIA] },
+  ...SUPPORTED_DESTINATION_CHAINS.map((id) => ({
+    id,
+    name: CHAIN_NAMES[id] || `Chain ${id}`,
+  })),
+]
+
+// ═══════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS (from lib/swap/index.ts)
+// ═══════════════════════════════════════════════════════════════
+
+function formatTokenAmount(amount: bigint, decimals: number, maxDecimals: number = 6): string {
+  if (amount === 0n) return '0'
+  const divisor = BigInt(10 ** decimals)
+  const whole = amount / divisor
+  const fraction = amount % divisor
+
+  if (fraction === 0n) {
+    return whole.toString()
+  }
+
+  const fractionStr = fraction.toString().padStart(decimals, '0')
+  const trimmedFraction = fractionStr
+    .slice(0, maxDecimals)
+    .replace(/0+$/, '')
+
+  return trimmedFraction ? `${whole}.${trimmedFraction}` : whole.toString()
+}
+
+function parseAmount(amount: string, decimals: number): bigint {
+  if (!amount || amount === '' || amount === '.') return BigInt(0)
+  const [integerPart, fractionalPart = ''] = amount.split('.')
+  const paddedFractional = fractionalPart
+    .padEnd(decimals, '0')
+    .slice(0, decimals)
+  return BigInt(integerPart + paddedFractional)
+}
+
+function getPool(tokenA: TokenSymbol, tokenB: TokenSymbol): CrossChainPool | null {
+  const pairKey = `${tokenA}_${tokenB}` as PoolPair
+  const reversePairKey = `${tokenB}_${tokenA}` as PoolPair
+
+  if (CROSS_CHAIN_POOLS[pairKey]) {
+    return CROSS_CHAIN_POOLS[pairKey]
+  }
+  if (CROSS_CHAIN_POOLS[reversePairKey]) {
+    return CROSS_CHAIN_POOLS[reversePairKey]
+  }
+
+  return null
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SWAP SCREEN COMPONENT
+// ═══════════════════════════════════════════════════════════════
 
 const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
-  const [fromToken, setFromToken] = useState(TOKENS[0])
-  const [toToken, setToToken] = useState(TOKENS[1])
-  const [destChain, setDestChain] = useState(CHAINS[0])
+  // Token selection
+  const [fromToken, setFromToken] = useState<PoolToken>(CROSS_CHAIN_TOKENS.ETH)
+  const [toToken, setToToken] = useState<PoolToken>(CROSS_CHAIN_TOKENS.USDT)
+
+  // Source and destination chains
+  const [fromChainId, setFromChainId] = useState<ChainId>(CHAIN_IDS.SEPOLIA)
+  const [destChainId, setDestChainId] = useState<ChainId>(CHAIN_IDS.ARBITRUM_SEPOLIA)
+
+  // Amount input
   const [fromAmount, setFromAmount] = useState('')
-  const [toAmount, setToAmount] = useState('')
-  const [fromBalance, setFromBalance] = useState('0.00')
-  const [toBalance, setToBalance] = useState('0.00')
-  const [showFromTokenDropdown, setShowFromTokenDropdown] = useState(false)
-  const [showToTokenDropdown, setShowToTokenDropdown] = useState(false)
-  const [showChainDropdown, setShowChainDropdown] = useState(false)
+
+  // Quote state
+  const [quote, setQuote] = useState<CrossChainQuote | null>(null)
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+
+  // Slippage settings
   const [slippage, setSlippage] = useState(0.5)
   const [showSlippageSettings, setShowSlippageSettings] = useState(false)
-  const [quote, setQuote] = useState<any>(null)
-  const [isQuoteLoading, setIsQuoteLoading] = useState(false)
-  const [isSwapping, setIsSwapping] = useState(false)
-  const [showResult, setShowResult] = useState(false)
-  const [txHash, setTxHash] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
-  // Fetch balances on mount
+  // Dropdown visibility
+  const [showFromTokenDropdown, setShowFromTokenDropdown] = useState(false)
+  const [showToTokenDropdown, setShowToTokenDropdown] = useState(false)
+  const [showFromChainDropdown, setShowFromChainDropdown] = useState(false)
+  const [showToChainDropdown, setShowToChainDropdown] = useState(false)
+
+  // Execution state
+  const [isExecuting, setIsExecuting] = useState(false)
+  const [progress, setProgress] = useState<{
+    step: string
+    message: string
+    sourceTxHash?: string
+    destTxHash?: string
+    error?: Error
+  }>({ step: 'idle', message: '' })
+
+  // Balances
+  const [balances, setBalances] = useState<Record<TokenSymbol, bigint>>({
+    ETH: 0n,
+    USDT: 0n,
+    EURC: 0n,
+  })
+
+  // Fetch balances on mount and when account changes
   useEffect(() => {
     if (account?.address) {
       fetchBalances()
     }
   }, [account])
 
+  const fetchBalances = () => {
+    if (!account?.address) return
+
+    const tokens: TokenSymbol[] = ['ETH', 'USDT', 'EURC']
+    const newBalances: Record<TokenSymbol, bigint> = { ETH: 0n, USDT: 0n, EURC: 0n }
+
+    let completed = 0
+    tokens.forEach((token) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'GET_BALANCE',
+          data: {
+            address: account.address,
+            token,
+          },
+        },
+        (response) => {
+          if (response?.success) {
+            newBalances[token] = BigInt(response.balance || '0')
+          }
+          completed++
+          if (completed === tokens.length) {
+            setBalances(newBalances)
+          }
+        }
+      )
+    })
+  }
+
   // Fetch quote when inputs change
   useEffect(() => {
     const fetchQuote = async () => {
-      if (!fromAmount || parseFloat(fromAmount) === 0) {
+      if (!fromAmount || fromAmount === '' || parseFloat(fromAmount) === 0) {
         setQuote(null)
-        setToAmount('')
         return
       }
 
       setIsQuoteLoading(true)
-      setError(null)
+      setQuoteError(null)
 
       try {
-        // Get quote from background script
-        chrome.runtime.sendMessage(
-          {
-            type: 'GET_SWAP_QUOTE',
-            data: {
-              fromToken: fromToken.symbol,
-              toToken: toToken.symbol,
-              amount: fromAmount,
-              destChain: destChain.id,
-              slippage,
-            },
-          },
-          (response) => {
-            setIsQuoteLoading(false)
-            if (response?.success) {
-              setQuote(response.quote)
-              setToAmount(response.quote.outputAmount)
-            } else {
-              setError(response?.error || 'Failed to get quote')
-              setToAmount('')
-            }
+        const amountIn = parseAmount(fromAmount, fromToken.decimals)
+
+        // Find the pool for this token pair
+        const pool = getPool(fromToken.symbol, toToken.symbol)
+        if (!pool) {
+          setQuoteError('No pool found for this token pair')
+          setQuote(null)
+          setIsQuoteLoading(false)
+          return
+        }
+
+        // Determine operation type
+        const isCrossChain = fromChainId !== destChainId
+        const isSameToken = fromToken.symbol === toToken.symbol
+
+        let operationType: CrossChainOperationType
+        let feeBps: number
+        let amountOut: bigint
+        let priceImpact = 0
+
+        if (isCrossChain) {
+          if (isSameToken) {
+            operationType = 'transfer'
+            feeBps = CROSS_CHAIN_FEES.CROSS_CHAIN_TRANSFER_FEE_BPS
+            // For transfer, amount out is amount minus fee
+            const feeAmount = (amountIn * BigInt(feeBps)) / BigInt(10000)
+            amountOut = amountIn - feeAmount
+          } else {
+            operationType = 'cross_chain_swap'
+            feeBps = CROSS_CHAIN_FEES.CROSS_CHAIN_SWAP_FEE_BPS
+            // For cross-chain swap, we'd need to query the contract
+            // For now, estimate with a simple calculation
+            const feeAmount = (amountIn * BigInt(feeBps)) / BigInt(10000)
+            amountOut = amountIn - feeAmount
+            priceImpact = 0.1 // Placeholder
           }
-        )
+        } else {
+          operationType = 'swap'
+          feeBps = CROSS_CHAIN_FEES.SWAP_FEE_BPS
+          // For same-chain swap, calculate using pool reserves
+          // Placeholder calculation
+          const feeAmount = (amountIn * BigInt(feeBps)) / BigInt(10000)
+          amountOut = (amountIn * 99n) / 100n // Rough estimate
+          priceImpact = 0.05
+        }
+
+        // Calculate min amount out based on slippage
+        const slippageBps = Math.floor(slippage * 100)
+        const minAmountOut = (amountOut * BigInt(10000 - slippageBps)) / BigInt(10000)
+
+        const newQuote: CrossChainQuote = {
+          type: operationType,
+          tokenIn: fromToken,
+          tokenOut: toToken,
+          sourceChainId: fromChainId,
+          destChainId,
+          amountIn,
+          amountOut,
+          minAmountOut,
+          priceImpact,
+          feeAmount: amountIn - amountOut,
+          feeBps,
+          pool,
+        }
+
+        setQuote(newQuote)
       } catch (err) {
+        setQuoteError(err instanceof Error ? err.message : 'Failed to get quote')
+        setQuote(null)
+      } finally {
         setIsQuoteLoading(false)
-        setError('Failed to get quote')
-        setToAmount('')
       }
     }
 
-    const debounceTimeout = setTimeout(fetchQuote, 500)
+    const debounceTimeout = setTimeout(fetchQuote, 300)
     return () => clearTimeout(debounceTimeout)
-  }, [fromAmount, fromToken, toToken, destChain, slippage])
+  }, [fromAmount, fromToken, toToken, fromChainId, destChainId, slippage])
 
-  const fetchBalances = () => {
-    if (!account?.address) return
+  // Get formatted output amount
+  const outputAmount = quote
+    ? formatTokenAmount(quote.amountOut, toToken.decimals, 6)
+    : ''
 
-    // Fetch from token balance
-    chrome.runtime.sendMessage(
-      {
-        type: 'GET_BALANCE',
-        data: {
-          address: account.address,
-          token: fromToken.symbol,
-        },
-      },
-      (response) => {
-        if (response?.success) {
-          const balance = parseFloat(response.balance || '0').toFixed(4)
-          setFromBalance(balance)
-        }
-      }
-    )
+  // Get formatted balance
+  const fromBalance = formatTokenAmount(
+    balances[fromToken.symbol],
+    fromToken.decimals,
+    4
+  )
+  const toBalance = formatTokenAmount(
+    balances[toToken.symbol],
+    toToken.decimals,
+    4
+  )
 
-    // Fetch to token balance
-    chrome.runtime.sendMessage(
-      {
-        type: 'GET_BALANCE',
-        data: {
-          address: account.address,
-          token: toToken.symbol,
-        },
-      },
-      (response) => {
-        if (response?.success) {
-          const balance = parseFloat(response.balance || '0').toFixed(4)
-          setToBalance(balance)
-        }
-      }
-    )
-  }
+  // Check if user has sufficient balance
+  const insufficientBalance = (() => {
+    if (!fromAmount || fromAmount === '') return false
+    const inputParsed = parseFloat(fromAmount)
+    const balanceParsed = parseFloat(fromBalance)
+    return inputParsed > balanceParsed
+  })()
 
+  // Is cross-chain operation
+  const isCrossChain = fromChainId !== destChainId
+
+  // Swap direction - swap tokens, chains, and amount
   const handleSwapDirection = () => {
     const tempToken = fromToken
-    const tempAmount = fromAmount
     setFromToken(toToken)
     setToToken(tempToken)
-    setFromAmount(toAmount)
-    setToAmount(tempAmount)
+
+    const tempChain = fromChainId
+    setFromChainId(destChainId)
+    setDestChainId(tempChain)
+
+    setFromAmount(outputAmount)
   }
 
+  // Set max amount
   const handleMaxClick = () => {
     setFromAmount(fromBalance)
   }
 
+  // Execute swap/transfer
   const handleSwap = async () => {
     if (!quote || !account) return
 
-    setIsSwapping(true)
-    setError(null)
+    setIsExecuting(true)
+    setProgress({ step: 'executing', message: 'Executing transaction...' })
 
-    chrome.runtime.sendMessage(
-      {
-        type: 'EXECUTE_SWAP',
-        data: {
-          fromToken: fromToken.symbol,
-          toToken: toToken.symbol,
-          amount: fromAmount,
-          destChain: destChain.id,
-          quote,
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: 'EXECUTE_SWAP',
+          data: {
+            fromToken: fromToken.symbol,
+            toToken: toToken.symbol,
+            amount: fromAmount,
+            destChainId,
+            fromChainId,
+            quote,
+            address: account.address,
+          },
         },
-      },
-      (response) => {
-        setIsSwapping(false)
-        if (response?.success) {
-          setTxHash(response.txHash)
-          setShowResult(true)
-          setFromAmount('')
-          setToAmount('')
-          setQuote(null)
-          fetchBalances()
-        } else {
-          setError(response?.error || 'Swap failed')
+        (response) => {
+          setIsExecuting(false)
+
+          if (response?.success) {
+            setProgress({
+              step: 'complete',
+              message: 'Transaction successful!',
+              sourceTxHash: response.txHash,
+            })
+            fetchBalances()
+            setFromAmount('')
+            setQuote(null)
+          } else {
+            setProgress({
+              step: 'error',
+              message: 'Transaction failed',
+              error: new Error(response?.error || 'Unknown error'),
+            })
+          }
         }
-      }
-    )
+      )
+    } catch (err) {
+      setIsExecuting(false)
+      setProgress({
+        step: 'error',
+        message: 'Transaction failed',
+        error: err instanceof Error ? err : new Error('Unknown error'),
+      })
+    }
   }
 
-  const handleCloseResult = () => {
-    setShowResult(false)
-    setTxHash(null)
+  // Get button state
+  const getButtonState = (): { text: string; disabled: boolean } => {
+    if (!account) {
+      return { text: 'No Account', disabled: true }
+    }
+    if (isExecuting) {
+      return { text: progress.message, disabled: true }
+    }
+    if (!fromAmount || fromAmount === '' || parseFloat(fromAmount) === 0) {
+      return { text: 'Enter Amount', disabled: true }
+    }
+    if (insufficientBalance) {
+      return { text: `Insufficient ${fromToken.symbol}`, disabled: true }
+    }
+    if (isQuoteLoading) {
+      return { text: 'Fetching Quote...', disabled: true }
+    }
+    if (quoteError) {
+      return { text: 'No Route Available', disabled: true }
+    }
+    if (!quote) {
+      return { text: 'Enter Amount', disabled: true }
+    }
+
+    // Dynamic button text based on operation type
+    if (quote.type === 'transfer') {
+      return { text: `Transfer to ${CHAIN_NAMES[destChainId]}`, disabled: false }
+    }
+    if (quote.type === 'cross_chain_swap') {
+      return { text: `Swap to ${CHAIN_NAMES[destChainId]}`, disabled: false }
+    }
+    return { text: isCrossChain ? `Swap to ${CHAIN_NAMES[destChainId]}` : 'Swap', disabled: false }
   }
 
-  const insufficientBalance = () => {
-    if (!fromAmount || fromAmount === '') return false
-    return parseFloat(fromAmount) > parseFloat(fromBalance)
-  }
+  const buttonState = getButtonState()
 
-  const canSwap = () => {
-    return (
-      fromAmount &&
-      parseFloat(fromAmount) > 0 &&
-      !insufficientBalance() &&
-      toAmount &&
-      !isQuoteLoading &&
-      !isSwapping
-    )
-  }
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowFromTokenDropdown(false)
+      setShowToTokenDropdown(false)
+      setShowFromChainDropdown(false)
+      setShowToChainDropdown(false)
+    }
 
-  const isCrossChain = destChain.id !== 'sepolia'
-
-  const getButtonText = () => {
-    if (isSwapping) return 'Swapping...'
-    if (!fromAmount || fromAmount === '') return 'Enter Amount'
-    if (insufficientBalance()) return `Insufficient ${fromToken.symbol}`
-    if (isQuoteLoading) return 'Fetching Quote...'
-    if (error && !quote) return 'No Route Available'
-    if (quote?.type === 'transfer') return `Transfer to ${destChain.name}`
-    if (quote?.type === 'cross_chain_swap') return `Swap to ${destChain.name}`
-    return 'Swap'
-  }
+    if (showFromTokenDropdown || showToTokenDropdown || showFromChainDropdown || showToChainDropdown) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [showFromTokenDropdown, showToTokenDropdown, showFromChainDropdown, showToChainDropdown])
 
   return (
     <div style={styles.container}>
@@ -229,7 +549,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
             ←
           </button>
         )}
-        <h2 style={styles.title}>Swap</h2>
+        <h2 style={styles.title}>Cross-Chain Swap</h2>
         <button
           onClick={() => setShowSlippageSettings(!showSlippageSettings)}
           style={styles.settingsButton}
@@ -241,7 +561,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
       {/* Account Info */}
       {account && (
         <div style={styles.accountCard}>
-          <p style={styles.accountLabel}>From</p>
+          <p style={styles.accountLabel}>Connected</p>
           <p style={styles.accountAddress}>
             {account.address.slice(0, 6)}...{account.address.slice(-4)}
           </p>
@@ -284,61 +604,29 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
         </div>
       )}
 
-      {/* Destination Chain Selector */}
-      <div style={styles.section}>
-        <label style={styles.label}>Destination Chain</label>
-        <div style={styles.dropdownContainer}>
-          <button
-            onClick={() => setShowChainDropdown(!showChainDropdown)}
-            style={styles.dropdownButton}
-          >
-            <span style={styles.dropdownText}>{destChain.name}</span>
-            <span style={styles.dropdownArrow}>▼</span>
-          </button>
-
-          {showChainDropdown && (
-            <div style={styles.dropdownMenu}>
-              {CHAINS.map((chain) => (
-                <button
-                  key={chain.id}
-                  onClick={() => {
-                    setDestChain(chain)
-                    setShowChainDropdown(false)
-                  }}
-                  style={{
-                    ...styles.dropdownItem,
-                    ...(destChain.id === chain.id ? styles.dropdownItemActive : {}),
-                  }}
-                >
-                  {chain.name}
-                  {destChain.id === chain.id && <span style={styles.checkmark}>✓</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* From Token */}
       <div style={styles.section}>
         <div style={styles.tokenHeader}>
-          <label style={styles.label}>From (Sepolia)</label>
+          <label style={styles.label}>From</label>
           <span style={styles.balanceLabel}>
             Balance: {fromBalance} {fromToken.symbol}
           </span>
         </div>
         <div style={styles.tokenCard}>
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation()
               setShowFromTokenDropdown(!showFromTokenDropdown)
               setShowToTokenDropdown(false)
-              setShowChainDropdown(false)
+              setShowFromChainDropdown(false)
+              setShowToChainDropdown(false)
             }}
-            style={styles.tokenButton}
+            style={styles.tokenIconButton}
           >
-            <span style={styles.tokenSymbol}>{fromToken.symbol}</span>
-            <span style={styles.tokenName}>{fromToken.name}</span>
-            <span style={styles.dropdownArrow}>▼</span>
+            {React.createElement(TOKEN_ICONS[fromToken.symbol], {
+              variant: 'branded',
+              style: { width: 40, height: 40 },
+            })}
           </button>
           <div style={styles.amountContainer}>
             <input
@@ -348,30 +636,97 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
               onChange={(e) => setFromAmount(e.target.value)}
               style={{
                 ...styles.amountInput,
-                ...(insufficientBalance() ? styles.amountInputError : {}),
+                ...(insufficientBalance ? styles.amountInputError : {}),
               }}
             />
             <button onClick={handleMaxClick} style={styles.maxButton}>
               MAX
             </button>
           </div>
+          <div style={styles.tokenRightButtons}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowFromTokenDropdown(!showFromTokenDropdown)
+                setShowToTokenDropdown(false)
+                setShowFromChainDropdown(false)
+                setShowToChainDropdown(false)
+              }}
+              style={styles.tokenSymbolButton}
+            >
+              {fromToken.symbol}
+            </button>
+            <div style={styles.relative}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowFromChainDropdown(!showFromChainDropdown)
+                  setShowToChainDropdown(false)
+                  setShowFromTokenDropdown(false)
+                  setShowToTokenDropdown(false)
+                }}
+                style={styles.chainButton}
+              >
+                {React.createElement(CHAIN_ICONS[fromChainId], {
+                  variant: 'branded',
+                  style: { width: 20, height: 20 },
+                })}
+              </button>
+              {showFromChainDropdown && (
+                <div style={styles.dropdownMenu}>
+                  {SOURCE_CHAIN_OPTIONS.map((chain) => (
+                    <button
+                      key={chain.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setFromChainId(chain.id)
+                        setShowFromChainDropdown(false)
+                      }}
+                      style={{
+                        ...styles.dropdownItem,
+                        ...(fromChainId === chain.id ? styles.dropdownItemActive : {}),
+                      }}
+                    >
+                      {React.createElement(CHAIN_ICONS[chain.id], {
+                        variant: 'branded',
+                        style: { width: 24, height: 24 },
+                      })}
+                      <span style={{ marginLeft: 8 }}>{chain.name}</span>
+                      {fromChainId === chain.id && <span style={styles.checkmark}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
+        {/* From Token Dropdown */}
         {showFromTokenDropdown && (
           <div style={styles.tokenDropdown}>
-            {TOKENS.filter((t) => t.symbol !== toToken.symbol).map((token) => (
+            {TOKEN_LIST.filter(
+              (t) => t.symbol !== toToken.symbol
+            ).map((token) => (
               <button
                 key={token.symbol}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation()
                   setFromToken(token)
                   setShowFromTokenDropdown(false)
                   fetchBalances()
                 }}
                 style={styles.tokenDropdownItem}
               >
+                {React.createElement(TOKEN_ICONS[token.symbol], {
+                  variant: 'branded',
+                  style: { width: 32, height: 32 },
+                })}
                 <div>
                   <div style={styles.tokenDropdownSymbol}>{token.symbol}</div>
                   <div style={styles.tokenDropdownName}>{token.name}</div>
+                </div>
+                <div style={styles.tokenDropdownBalance}>
+                  {formatTokenAmount(balances[token.symbol], token.decimals, 4)}
                 </div>
               </button>
             ))}
@@ -389,9 +744,7 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
       {/* To Token */}
       <div style={styles.section}>
         <div style={styles.tokenHeader}>
-          <label style={styles.label}>
-            To ({isCrossChain ? destChain.name.split(' ')[0] : 'Sepolia'})
-          </label>
+          <label style={styles.label}>To</label>
           {!isCrossChain && (
             <span style={styles.balanceLabel}>
               Balance: {toBalance} {toToken.symbol}
@@ -400,38 +753,105 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
         </div>
         <div style={styles.tokenCard}>
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation()
               setShowToTokenDropdown(!showToTokenDropdown)
               setShowFromTokenDropdown(false)
-              setShowChainDropdown(false)
+              setShowFromChainDropdown(false)
+              setShowToChainDropdown(false)
             }}
-            style={styles.tokenButton}
+            style={styles.tokenIconButton}
           >
-            <span style={styles.tokenSymbol}>{toToken.symbol}</span>
-            <span style={styles.tokenName}>{toToken.name}</span>
-            <span style={styles.dropdownArrow}>▼</span>
+            {React.createElement(TOKEN_ICONS[toToken.symbol], {
+              variant: 'branded',
+              style: { width: 40, height: 40 },
+            })}
           </button>
           <div style={styles.amountContainer}>
             {isQuoteLoading ? (
               <div style={styles.loadingAmount}>...</div>
             ) : (
-              <div style={styles.outputAmount}>{toAmount || '0.00'}</div>
+              <div style={styles.outputAmount}>{outputAmount || '0.00'}</div>
             )}
+          </div>
+          <div style={styles.tokenRightButtons}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowToTokenDropdown(!showToTokenDropdown)
+                setShowFromTokenDropdown(false)
+                setShowFromChainDropdown(false)
+                setShowToChainDropdown(false)
+              }}
+              style={styles.tokenSymbolButton}
+            >
+              {toToken.symbol}
+            </button>
+            <div style={styles.relative}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowToChainDropdown(!showToChainDropdown)
+                  setShowFromChainDropdown(false)
+                  setShowFromTokenDropdown(false)
+                  setShowToTokenDropdown(false)
+                }}
+                style={styles.chainButton}
+              >
+                {React.createElement(CHAIN_ICONS[destChainId], {
+                  variant: 'branded',
+                  style: { width: 20, height: 20 },
+                })}
+              </button>
+              {showToChainDropdown && (
+                <div style={styles.dropdownMenu}>
+                  {DEST_CHAIN_OPTIONS.map((chain) => (
+                    <button
+                      key={chain.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDestChainId(chain.id)
+                        setShowToChainDropdown(false)
+                      }}
+                      style={{
+                        ...styles.dropdownItem,
+                        ...(destChainId === chain.id ? styles.dropdownItemActive : {}),
+                      }}
+                    >
+                      {React.createElement(CHAIN_ICONS[chain.id], {
+                        variant: 'branded',
+                        style: { width: 24, height: 24 },
+                      })}
+                      <span style={{ marginLeft: 8 }}>{chain.name}</span>
+                      {destChainId === chain.id && <span style={styles.checkmark}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
+        {/* To Token Dropdown */}
         {showToTokenDropdown && (
           <div style={styles.tokenDropdown}>
-            {TOKENS.filter((t) => t.symbol !== fromToken.symbol).map((token) => (
+            {TOKEN_LIST.filter(
+              (t) => t.symbol !== fromToken.symbol
+            ).map((token) => (
               <button
                 key={token.symbol}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation()
                   setToToken(token)
                   setShowToTokenDropdown(false)
                   fetchBalances()
                 }}
                 style={styles.tokenDropdownItem}
               >
+                {React.createElement(TOKEN_ICONS[token.symbol], {
+                  variant: 'branded',
+                  style: { width: 32, height: 32 },
+                })}
                 <div>
                   <div style={styles.tokenDropdownSymbol}>{token.symbol}</div>
                   <div style={styles.tokenDropdownName}>{token.name}</div>
@@ -446,44 +866,41 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
       {quote && (
         <div style={styles.quoteCard}>
           <div style={styles.quoteRow}>
+            <span style={styles.quoteLabel}>Route</span>
+            <span style={styles.quoteValue}>
+              {CHAIN_NAMES[fromChainId]} → {CHAIN_NAMES[destChainId]}
+            </span>
+          </div>
+          <div style={styles.quoteRow}>
             <span style={styles.quoteLabel}>Operation</span>
             <span style={styles.quoteValue}>
-              {quote.type?.replace('_', ' ') || 'Swap'}
+              {quote.type.replace('_', ' ')}
             </span>
           </div>
           <div style={styles.quoteRow}>
             <span style={styles.quoteLabel}>Fee</span>
             <span style={styles.quoteValue}>
-              {((quote.feeBps || 0) / 100).toFixed(2)}%
+              {(quote.feeBps / 100).toFixed(2)}%
             </span>
           </div>
-          {quote.priceImpact !== undefined && (
-            <div style={styles.quoteRow}>
-              <span style={styles.quoteLabel}>Price Impact</span>
-              <span
-                style={{
-                  ...styles.quoteValue,
-                  ...(quote.priceImpact > 1 ? styles.warning : {}),
-                }}
-              >
-                {quote.priceImpact.toFixed(2)}%
-              </span>
-            </div>
-          )}
-          {quote.minAmountOut && (
-            <div style={styles.quoteRow}>
-              <span style={styles.quoteLabel}>Min. Received</span>
-              <span style={styles.quoteValue}>
-                {quote.minAmountOut} {toToken.symbol}
-              </span>
-            </div>
-          )}
-          {isCrossChain && (
-            <div style={styles.quoteRow}>
-              <span style={styles.quoteLabel}>Destination</span>
-              <span style={styles.quoteValueHighlight}>{destChain.name}</span>
-            </div>
-          )}
+          <div style={styles.quoteRow}>
+            <span style={styles.quoteLabel}>Price Impact</span>
+            <span
+              style={{
+                ...styles.quoteValue,
+                ...(quote.priceImpact > 1 ? styles.warning : {}),
+              }}
+            >
+              {quote.priceImpact.toFixed(2)}%
+            </span>
+          </div>
+          <div style={styles.quoteRow}>
+            <span style={styles.quoteLabel}>Min. Received</span>
+            <span style={styles.quoteValue}>
+              {formatTokenAmount(quote.minAmountOut, toToken.decimals, 6)}{' '}
+              {toToken.symbol}
+            </span>
+          </div>
           <div style={styles.quoteRow}>
             <span style={styles.quoteLabel}>Slippage</span>
             <span
@@ -498,22 +915,34 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
         </div>
       )}
 
-      {/* Cross-chain indicator */}
-      {isCrossChain && (
-        <div style={styles.crossChainCard}>
-          <div style={styles.crossChainContent}>
-            <span style={styles.crossChainIcon}>⚡</span>
-            <span style={styles.crossChainText}>Cross-Chain</span>
-            <span style={styles.crossChainHint}>Tokens will be bridged</span>
+      {/* Transaction Progress */}
+      {isExecuting && (
+        <div style={styles.progressCard}>
+          <div style={styles.progressContent}>
+            <div style={styles.spinner} />
+            <span style={styles.progressText}>{progress.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {progress.step === 'complete' && progress.sourceTxHash && (
+        <div style={styles.successCard}>
+          <div style={styles.successContent}>
+            <span style={styles.successIcon}>✓</span>
+            <span style={styles.successText}>Transaction successful</span>
+          </div>
+          <div style={styles.txHash}>
+            {progress.sourceTxHash.slice(0, 10)}...{progress.sourceTxHash.slice(-8)}
           </div>
         </div>
       )}
 
       {/* Error Message */}
-      {error && !quote && (
+      {progress.step === 'error' && progress.error && (
         <div style={styles.errorCard}>
           <span style={styles.errorIcon}>⚠️</span>
-          <span style={styles.errorText}>{error}</span>
+          <span style={styles.errorText}>{progress.error.message}</span>
         </div>
       )}
 
@@ -521,43 +950,15 @@ const SwapScreen: React.FC<SwapScreenProps> = ({ account, onBack }) => {
       <div style={styles.buttonContainer}>
         <button
           onClick={handleSwap}
-          disabled={!canSwap()}
+          disabled={buttonState.disabled}
           style={{
             ...styles.swapButton,
-            ...(canSwap() ? styles.swapButtonActive : {}),
+            ...(buttonState.disabled ? styles.swapButtonDisabled : styles.swapButtonEnabled),
           }}
         >
-          {getButtonText()}
+          {buttonState.text}
         </button>
       </div>
-
-      {/* Result Modal */}
-      {showResult && (
-        <div style={styles.modalOverlay} onClick={handleCloseResult}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.successIcon}>✓</div>
-            <h3 style={styles.modalTitle}>
-              {isCrossChain ? 'Cross-chain swap initiated!' : 'Swap complete!'}
-            </h3>
-            {txHash && (
-              <div style={styles.txHashContainer}>
-                <p style={styles.txHashLabel}>Transaction Hash</p>
-                <p style={styles.txHash}>
-                  {txHash.slice(0, 10)}...{txHash.slice(-8)}
-                </p>
-              </div>
-            )}
-            {isCrossChain && (
-              <p style={styles.modalHint}>
-                Your tokens are being bridged. This may take a few minutes.
-              </p>
-            )}
-            <button onClick={handleCloseResult} style={styles.modalButton}>
-              Done
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -571,6 +972,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column' as const,
     color: '#ffffff',
+    overflowY: 'auto' as const,
   },
   header: {
     display: 'flex',
@@ -596,7 +998,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '4px 8px',
   },
   title: {
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 'bold',
     margin: 0,
     fontFamily: 'Doto, sans-serif',
@@ -677,36 +1079,47 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255, 255, 255, 0.1)',
     padding: '12px',
     display: 'flex',
-    flexDirection: 'column' as const,
+    alignItems: 'center',
     gap: '10px',
   },
-  tokenButton: {
+  tokenIconButton: {
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '8px',
-    background: 'rgba(255, 255, 255, 0.05)',
+    justifyContent: 'center',
+  },
+  tokenRightButtons: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  tokenSymbolButton: {
+    padding: '6px 10px',
     borderRadius: '8px',
+    background: 'rgba(255, 255, 255, 0.05)',
     border: 'none',
     color: '#ffffff',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  tokenSymbol: {
-    fontSize: '16px',
+    fontSize: '13px',
     fontWeight: 'bold',
+    cursor: 'pointer',
   },
-  tokenName: {
+  chainButton: {
+    padding: '6px 10px',
+    borderRadius: '8px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: 'none',
+    color: '#ffffff',
     fontSize: '12px',
-    color: 'rgba(255, 255, 255, 0.5)',
-    flex: 1,
-    textAlign: 'left' as const,
+    cursor: 'pointer',
   },
-  dropdownArrow: {
-    fontSize: '10px',
-    color: 'rgba(255, 255, 255, 0.5)',
+  relative: {
+    position: 'relative' as const,
   },
   amountContainer: {
+    flex: 1,
     display: 'flex',
     gap: '8px',
     alignItems: 'center',
@@ -716,7 +1129,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     color: '#ffffff',
-    fontSize: '24px',
+    fontSize: '20px',
     fontWeight: 'bold',
     outline: 'none',
     fontFamily: 'Doto, sans-serif',
@@ -726,23 +1139,23 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ff76a8',
   },
   maxButton: {
-    padding: '6px 10px',
+    padding: '4px 8px',
     borderRadius: '6px',
     background: 'rgba(255, 255, 255, 0.1)',
     border: 'none',
     color: '#ffffff',
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: 'bold',
     cursor: 'pointer',
   },
   loadingAmount: {
-    fontSize: '24px',
+    fontSize: '20px',
     fontWeight: 'bold',
     color: 'rgba(255, 255, 255, 0.4)',
     animation: 'pulse 1s infinite',
   },
   outputAmount: {
-    fontSize: '24px',
+    fontSize: '20px',
     fontWeight: 'bold',
     color: '#ffffff',
   },
@@ -780,6 +1193,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: 'rgba(255, 255, 255, 0.5)',
   },
+  tokenDropdownBalance: {
+    marginLeft: 'auto',
+    fontSize: '13px',
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
   swapDirectionContainer: {
     display: 'flex',
     justifyContent: 'center',
@@ -801,39 +1219,20 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     transition: 'all 0.2s',
   },
-  dropdownContainer: {
-    position: 'relative' as const,
-  },
-  dropdownButton: {
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px',
-    borderRadius: '10px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    background: 'rgba(255, 255, 255, 0.03)',
-    color: '#ffffff',
-    fontSize: '14px',
-    cursor: 'pointer',
-  },
-  dropdownText: {
-    fontWeight: 'bold',
-  },
   dropdownMenu: {
     position: 'absolute' as const,
     top: '100%',
-    left: 0,
     right: 0,
     marginTop: '4px',
     background: '#000000',
     border: '1px solid rgba(255, 255, 255, 0.1)',
     borderRadius: '10px',
     zIndex: 100,
+    minWidth: '180px',
   },
   dropdownItem: {
     width: '100%',
-    padding: '12px',
+    padding: '10px 12px',
     background: 'transparent',
     border: 'none',
     borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
@@ -842,14 +1241,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    fontSize: '14px',
+    fontSize: '13px',
   },
   dropdownItemActive: {
     background: 'rgba(255, 118, 168, 0.1)',
   },
   checkmark: {
     color: '#ff76a8',
-    fontSize: '14px',
+    fontSize: '12px',
   },
   quoteCard: {
     margin: '0 20px 12px',
@@ -870,37 +1269,58 @@ const styles: Record<string, React.CSSProperties> = {
   quoteValue: {
     fontWeight: 'bold',
   },
-  quoteValueHighlight: {
-    fontWeight: 'bold',
-    color: '#ff76a8',
-  },
   warning: {
     color: '#ffd700',
   },
-  crossChainCard: {
+  progressCard: {
     margin: '0 20px 12px',
     padding: '12px',
-    background: 'rgba(255, 118, 168, 0.05)',
+    background: 'rgba(255, 255, 255, 0.03)',
     borderRadius: '10px',
-    border: '1px solid rgba(255, 118, 168, 0.2)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
   },
-  crossChainContent: {
+  progressContent: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  spinner: {
+    width: '18px',
+    height: '18px',
+    border: '2px solid rgba(255, 255, 255, 0.2)',
+    borderTopColor: '#ffffff',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  progressText: {
+    fontSize: '13px',
+  },
+  successCard: {
+    margin: '0 20px 12px',
+    padding: '12px',
+    background: 'rgba(0, 255, 100, 0.1)',
+    borderRadius: '10px',
+    border: '1px solid rgba(0, 255, 100, 0.3)',
+  },
+  successContent: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    marginBottom: '8px',
   },
-  crossChainIcon: {
-    fontSize: '16px',
+  successIcon: {
+    color: '#00ff64',
+    fontSize: '14px',
   },
-  crossChainText: {
+  successText: {
     fontSize: '13px',
-    fontWeight: 'bold',
-    color: '#ff76a8',
+    color: '#00ff64',
   },
-  crossChainHint: {
+  txHash: {
     fontSize: '11px',
-    color: 'rgba(255, 255, 255, 0.4)',
-    marginLeft: 'auto',
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontFamily: 'monospace',
+    wordBreak: 'break-all' as const,
   },
   errorCard: {
     margin: '0 20px 12px',
@@ -913,7 +1333,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   errorIcon: {
-    fontSize: '16px',
+    fontSize: '14px',
   },
   errorText: {
     fontSize: '13px',
@@ -928,97 +1348,21 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     padding: '14px',
     borderRadius: '10px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    background: 'rgba(255, 255, 255, 0.05)',
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'not-allowed',
-    transition: 'all 0.2s',
-    fontFamily: 'Doto, sans-serif',
-  },
-  swapButtonActive: {
-    background: '#ff76a8',
-    borderColor: '#ff76a8',
-    color: '#000000',
-    cursor: 'pointer',
-  },
-  modalOverlay: {
-    position: 'fixed' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.8)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '20px',
-  },
-  modalContent: {
-    background: '#111111',
-    borderRadius: '16px',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    padding: '32px',
-    maxWidth: '360px',
-    width: '100%',
-    textAlign: 'center' as const,
-  },
-  successIcon: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '50%',
-    background: 'rgba(0, 255, 100, 0.2)',
-    border: '2px solid rgba(0, 255, 100, 0.5)',
-    color: '#00ff64',
-    fontSize: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: '0 auto 16px',
-  },
-  modalTitle: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    margin: '0 0 16px 0',
-    color: '#ffffff',
-  },
-  txHashContainer: {
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '8px',
-    padding: '12px',
-    marginBottom: '16px',
-  },
-  txHashLabel: {
-    fontSize: '12px',
-    color: 'rgba(255, 255, 255, 0.5)',
-    margin: '0 0 4px 0',
-  },
-  txHash: {
-    fontSize: '13px',
-    fontFamily: 'monospace',
-    color: '#ffffff',
-    margin: 0,
-    wordBreak: 'break-all' as const,
-  },
-  modalHint: {
-    fontSize: '12px',
-    color: 'rgba(255, 255, 255, 0.5)',
-    margin: '0 0 20px 0',
-  },
-  modalButton: {
-    width: '100%',
-    padding: '14px',
-    borderRadius: '8px',
     border: 'none',
-    background: '#ff76a8',
-    color: '#000000',
     fontSize: '16px',
     fontWeight: 'bold',
     cursor: 'pointer',
     transition: 'all 0.2s',
     fontFamily: 'Doto, sans-serif',
+  },
+  swapButtonEnabled: {
+    background: '#ff76a8',
+    color: '#000000',
+  },
+  swapButtonDisabled: {
+    background: 'rgba(255, 255, 255, 0.1)',
+    color: 'rgba(255, 255, 255, 0.4)',
+    cursor: 'not-allowed',
   },
 }
 

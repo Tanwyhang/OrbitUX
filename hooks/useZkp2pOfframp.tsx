@@ -12,10 +12,7 @@ export interface ConversionRate {
   conversionRate: string
 }
 
-export interface DepositData {
-  email?: string
-  [key: string]: string | undefined
-}
+export type DepositData = Record<string, string>
 
 export interface CreateDepositParams {
   token: `0x${string}`
@@ -33,13 +30,14 @@ export interface AddFundsParams {
 
 export interface WithdrawDepositParams {
   depositId: bigint
+  txOverrides?: any
 }
 
 export interface UseZkp2pOfframpReturn {
-  createDeposit: (params: CreateDepositParams) => Promise<string | null>
-  addFunds: (params: AddFundsParams) => Promise<string | null>
-  removeFunds: (depositId: bigint, amount: bigint) => Promise<string | null>
-  withdrawDeposit: (params: WithdrawDepositParams) => Promise<string | null>
+  createDeposit: (params: CreateDepositParams) => Promise<`0x${string}` | null>
+  addFunds: (params: AddFundsParams) => Promise<`0x${string}` | null>
+  removeFunds: (depositId: bigint, amount: bigint) => Promise<`0x${string}` | null>
+  withdrawDeposit: (params: WithdrawDepositParams) => Promise<`0x${string}` | null>
   isCreatingDeposit: boolean
   isAddingFunds: boolean
   isWithdrawing: boolean
@@ -54,36 +52,38 @@ export interface UseZkp2pOfframpReturn {
 export function useZkp2pOfframp(
   client: any
 ): UseZkp2pOfframpReturn {
-  const { createDeposit: sdkCreateDeposit, isLoading: isCreatingDeposit, error: createError } = useCreateDeposit({ client })
-  const { addFunds: sdkAddFunds, isLoading: isAddingFunds } = useAddFunds({ client })
-  const { removeFunds: sdkRemoveFunds } = useRemoveFunds({ client })
-  const { withdrawDeposit: sdkWithdrawDeposit, isLoading: isWithdrawing } = useWithdrawDeposit({ client })
-
-  const createDeposit = async (params: CreateDepositParams): Promise<string | null> => {
-    if (!client) {
-      throw new Error('Client not available. Please connect your wallet.')
+  // When client is null, return disabled functions
+  if (!client) {
+    return {
+      createDeposit: async () => { throw new Error('PublicClient not available. Please connect your wallet.') },
+      addFunds: async () => { throw new Error('PublicClient not available. Please connect your wallet.') },
+      removeFunds: async () => { throw new Error('PublicClient not available. Please connect your wallet.') },
+      withdrawDeposit: async () => { throw new Error('PublicClient not available. Please connect your wallet.') },
+      isCreatingDeposit: false,
+      isAddingFunds: false,
+      isWithdrawing: false,
+      error: null,
     }
-    return sdkCreateDeposit(params as any)
   }
 
-  const addFunds = async (params: AddFundsParams): Promise<string | null> => {
-    if (!client) {
-      throw new Error('Client not available. Please connect your wallet.')
-    }
+  const { createDeposit: sdkCreateDeposit, isLoading: isCreatingDeposit, error: createError } = useCreateDeposit({ client: client as any })
+  const { addFunds: sdkAddFunds, isLoading: isAddingFunds } = useAddFunds({ client: client as any })
+  const { removeFunds: sdkRemoveFunds } = useRemoveFunds({ client: client as any })
+  const { withdrawDeposit: sdkWithdrawDeposit, isLoading: isWithdrawing } = useWithdrawDeposit({ client: client as any })
+
+  const createDeposit = async (params: CreateDepositParams) => {
+    return sdkCreateDeposit(params)
+  }
+
+  const addFunds = async (params: AddFundsParams) => {
     return sdkAddFunds(params)
   }
 
-  const removeFunds = async (depositId: bigint, amount: bigint): Promise<string | null> => {
-    if (!client) {
-      throw new Error('Client not available. Please connect your wallet.')
-    }
+  const removeFunds = async (depositId: bigint, amount: bigint) => {
     return sdkRemoveFunds({ depositId, amount })
   }
 
-  const withdrawDeposit = async (params: WithdrawDepositParams): Promise<string | null> => {
-    if (!client) {
-      throw new Error('Client not available. Please connect your wallet.')
-    }
+  const withdrawDeposit = async (params: WithdrawDepositParams) => {
     return sdkWithdrawDeposit(params)
   }
 

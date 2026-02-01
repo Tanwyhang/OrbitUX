@@ -226,87 +226,87 @@ export default function ZkWormholeContent() {
 
   return (
     <>
-      <div className="px-6 py-8">
+      <div className="px-4 sm:px-6 py-6 sm:py-8">
         <div className="mx-auto max-w-7xl">
           {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">zkWormhole</h1>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight">zkWormhole</h1>
               <p className="text-sm text-white/60">Private transfers on Sepolia</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
               {/* Stealth Mode Switch */}
               <button
                 onClick={toggleStealthMode}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-all duration-300 ease-in-out ${
-                  stealthMode 
-                    ? 'border-[hsl(var(--pink))]/50 bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]' 
+                className={`flex items-center gap-1.5 sm:gap-2 rounded-lg border px-2 sm:px-3 py-1.5 transition-all duration-300 ease-in-out ${
+                  stealthMode
+                    ? 'border-[hsl(var(--pink))]/50 bg-[hsl(var(--pink))]/20 text-[hsl(var(--pink))]'
                     : 'border-white/10 bg-black/30 text-white/60 hover:bg-white/5'
                 }`}
               >
                 {stealthMode ? (
-                  <EyeOff className="w-4 h-4" />
+                  <EyeOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 ) : (
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 )}
-                <span className="text-sm font-medium">Stealth Mode</span>
-                <div 
-                  className={`relative w-10 h-5 rounded-full transition-colors duration-300 ease-in-out ${
+                <span className="text-xs sm:text-sm font-medium">Stealth</span>
+                <div
+                  className={`relative w-8 sm:w-10 h-5 rounded-full transition-colors duration-300 ease-in-out ${
                     stealthMode ? 'bg-[hsl(var(--pink))]' : 'bg-white/20'
                   }`}
                 >
-                  <div 
-                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${
-                      stealthMode ? 'translate-x-5' : 'translate-x-0.5'
+                  <div
+                    className={`absolute top-0.5 h-3.5 sm:h-4 w-3.5 sm:w-4 rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${
+                      stealthMode ? 'translate-x-3.5 sm:translate-x-5' : 'translate-x-0.5'
                     }`}
                   />
                 </div>
               </button>
-              
-              <span className="text-sm text-muted">Source Chain:</span>
-              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-1.5">
+
+              <span className="text-xs sm:text-sm text-muted">Source:</span>
+              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-2 sm:px-3 py-1.5">
                 <div className="h-2 w-2 rounded-full bg-green-500" />
-                <span className="text-sm font-medium">{sourceChain}</span>
+                <span className="text-xs sm:text-sm font-medium">{sourceChain}</span>
               </div>
             </div>
           </div>
 
           {/* Status Indicators */}
-          <div className="mb-4 flex flex-wrap gap-2">
+          <div className="mb-3 sm:mb-4 flex flex-wrap gap-2">
             {/* Wallet Status */}
             {isConnected && (
-              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-1.5">
-                <Wallet className="w-4 h-4 text-white/60" />
-                <span className="text-sm text-white/80 font-mono">
-                  {connectedAddress?.slice(0, 6)}...{connectedAddress?.slice(-4)}
+              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-2 sm:px-3 py-1.5">
+                <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/60" />
+                <span className="text-xs sm:text-sm text-white/80 font-mono">
+                  {connectedAddress?.slice(0, 5)}...{connectedAddress?.slice(-4)}
                 </span>
               </div>
             )}
-            
+
             {/* RAILGUN Wallet Status */}
             {walletStatus === 'ready' && railgunWallet && (
-              <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--pink))]/30 bg-[hsl(var(--pink))]/10 px-3 py-1.5">
-                <Shield className="w-4 h-4 text-[hsl(var(--pink))]" />
-                <span className="text-sm text-[hsl(var(--pink))] font-mono">
-                  {railgunWallet.railgunAddress.slice(0, 10)}...
+              <div className="flex items-center gap-2 rounded-lg border border-[hsl(var(--pink))]/30 bg-[hsl(var(--pink))]/10 px-2 sm:px-3 py-1.5">
+                <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[hsl(var(--pink))]" />
+                <span className="text-xs sm:text-sm text-[hsl(var(--pink))] font-mono">
+                  {railgunWallet.railgunAddress.slice(0, 8)}...
                 </span>
               </div>
             )}
 
             {/* Engine Status */}
             {engineStatus === 'initializing' && (
-              <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-1.5">
+              <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-2 sm:px-3 py-1.5">
                 <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                <span className="text-sm text-yellow-200">Initializing RAILGUN...</span>
+                <span className="text-xs sm:text-sm text-yellow-200">Initializing RAILGUN...</span>
               </div>
             )}
           </div>
 
           {/* Add Recipient Button */}
-          <div className="mb-4 flex justify-end">
+          <div className="mb-3 sm:mb-4 flex justify-end">
             <button
               onClick={addRecipient}
-              className="rounded-lg bg-transparent border border-white/10 px-4 py-2 font-semibold text-white hover:bg-white/10 transition-colors backdrop-blur-xl"
+              className="rounded-lg bg-transparent border border-white/10 px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold text-white hover:bg-white/10 transition-colors backdrop-blur-xl"
             >
               + Add Recipient
             </button>
@@ -316,37 +316,37 @@ export default function ZkWormholeContent() {
           <div className="grid gap-3">
             <AnimatePresence mode="popLayout">
               {recipients.map((recipient) => (
-                <motion.div 
-                  key={recipient.id} 
-                  className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl"
+                <motion.div
+                  key={recipient.id}
+                  className="rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4 backdrop-blur-xl"
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20, scale: 0.95 }}
-                  transition={{ 
+                  transition={{
                     duration: 0.3,
                     ease: [0, 0.63, 0.08, 0.99]
                   }}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                       <div className="relative">
                         <input
                           type="text"
                           value={recipient.address}
                           onChange={(e) => updateRecipient(recipient.id, 'address', e.target.value)}
                           placeholder="0x... recipient address"
-                          className={`w-full rounded-lg border bg-black/30 px-3 py-2 outline-none font-mono text-sm transition-colors ${
+                          className={`w-full rounded-lg border bg-black/30 px-2 sm:px-3 py-2 outline-none font-mono text-xs sm:text-sm transition-colors ${
                             recipient.address && !isValidAddress(recipient.address)
                               ? 'border-red-500/50 focus:border-red-500'
                               : 'border-white/10 focus:border-[hsl(var(--pink))]'
                           }`}
                         />
                         {recipient.address && !isValidAddress(recipient.address) && (
-                          <p className="absolute -bottom-5 left-0 text-xs text-red-400">Invalid address</p>
+                          <p className="absolute -bottom-4 sm:-bottom-5 left-0 text-xs text-red-400">Invalid address</p>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-2 sm:px-3 py-2">
                         <input
                           type="number"
                           value={recipient.amount}
@@ -354,15 +354,15 @@ export default function ZkWormholeContent() {
                           placeholder="0"
                           min="0"
                           step="0.01"
-                          className="flex-1 bg-transparent text-lg font-semibold outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="flex-1 bg-transparent text-base sm:text-lg font-semibold outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <div className="flex items-center gap-2">
-                          <StablecoinIcon symbol={recipient.token} className="h-6 w-6" />
+                          <StablecoinIcon symbol={recipient.token} className="h-5 w-5 sm:h-6 sm:w-6" />
                           <div className="relative">
                             <select
                               value={recipient.token}
                               onChange={(e) => updateRecipient(recipient.id, 'token', e.target.value)}
-                              className="appearance-none bg-white/10 hover:bg-white/20 border border-white/10 rounded-md px-2 py-1 pr-6 text-sm font-medium cursor-pointer outline-none focus:border-[hsl(var(--pink))] transition-colors"
+                              className="appearance-none bg-white/10 hover:bg-white/20 border border-white/10 rounded-md px-2 py-1 pr-5 sm:pr-6 text-xs sm:text-sm font-medium cursor-pointer outline-none focus:border-[hsl(var(--pink))] transition-colors"
                               disabled={stablecoinsLoading}
                             >
                               {stablecoinsLoading ? (
@@ -375,7 +375,7 @@ export default function ZkWormholeContent() {
                                 ))
                               )}
                             </select>
-                            <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none text-white/60" />
+                            <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-2.5 h-2.5 sm:w-3 sm:h-3 pointer-events-none text-white/60" />
                           </div>
                         </div>
                       </div>
@@ -383,9 +383,9 @@ export default function ZkWormholeContent() {
 
                     <motion.button
                       onClick={() => removeRecipient(recipient.id)}
-                      className="rounded-lg bg-white/10 border border-white/10 p-2 text-white/50 transition-colors"
+                      className="rounded-lg bg-white/10 border border-white/10 p-1.5 sm:p-2 text-white/50 transition-colors flex-shrink-0 mt-1 sm:mt-0"
                       aria-label="Remove recipient"
-                      whileHover={{ 
+                      whileHover={{
                         scale: 1.1,
                         backgroundColor: 'rgba(255, 255, 255, 0.15)',
                         color: 'rgb(248 113 113)',
@@ -393,7 +393,7 @@ export default function ZkWormholeContent() {
                       }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </motion.button>
                   </div>
                 </motion.div>
@@ -403,13 +403,13 @@ export default function ZkWormholeContent() {
 
           {/* Summary and Send Button */}
           {recipients.length > 0 && (
-            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
-              <div className="flex items-center justify-between">
+            <div className="mt-3 sm:mt-4 rounded-xl border border-white/10 bg-white/5 p-3 sm:p-4 backdrop-blur-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
-                  <div className="text-sm text-muted">Total Amount</div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <div className="text-xs sm:text-sm text-muted">Total Amount</div>
+                  <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1">
                     {Object.entries(getTotalsByToken()).map(([token, amount]) => (
-                      <div key={token} className="text-2xl font-bold text-[hsl(var(--pink))]">
+                      <div key={token} className="text-xl sm:text-2xl font-bold text-[hsl(var(--pink))]">
                         {amount.toLocaleString()} {token}
                       </div>
                     ))}
@@ -426,10 +426,10 @@ export default function ZkWormholeContent() {
                     </div>
                   ) : null}
                 </div>
-                <button 
+                <button
                   onClick={buttonState.action}
                   disabled={buttonState.disabled}
-                  className="rounded-xl bg-white border border-white/10 px-6 py-3 font-semibold text-[hsl(var(--pink))] group hover:invert disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:invert-0 transition-all"
+                  className="rounded-xl bg-white border border-white/10 px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-[hsl(var(--pink))] group hover:invert disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:invert-0 transition-all whitespace-nowrap"
                 >
                   {buttonState.text}
                 </button>
