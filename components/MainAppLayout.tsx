@@ -51,7 +51,7 @@ function MainAppLayoutContent({ children }: { children: ReactNode }) {
         />
       </div>
       
-      <Link href="/card" className="fixed top-4 left-6 z-50 flex items-center gap-2">
+      <Link href="/" className="fixed top-4 left-6 z-50 flex items-center gap-2">
         <div className="h-14 w-auto rounded-lg bg-[hsl(var(--white))] flex items-center justify-center px-4 py-2">
           <h4 className="text-lg text-[hsl(var(--black))] font-bold">Orbit</h4>
         </div>
