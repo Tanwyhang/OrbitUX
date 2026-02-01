@@ -182,7 +182,7 @@ export function usePrivateTransfer() {
   const { address: senderAddress } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
-  const { wallet } = useRailgunWallet();
+  const { wallet, mnemonic, password } = useRailgunWallet();
   const { status: engineStatus, initialize: initEngine } = useRailgunEngine();
 
   const [state, setState] = useState<PrivateTransferState>({
@@ -481,6 +481,16 @@ export function usePrivateTransfer() {
       // ════════════════════════════════════════════════════════════════
       // STEP 4: Call API with SSE streaming for real-time progress
       // ════════════════════════════════════════════════════════════════
+      
+      // Validate mnemonic is available (required for serverless wallet recreation)
+      if (!mnemonic) {
+        throw new Error('Mnemonic not available. Please recreate your wallet.');
+      }
+      
+      if (!password) {
+        throw new Error('Password not available. Please recreate your wallet.');
+      }
+      
       const response = await fetch('/api/railgun/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -489,6 +499,8 @@ export function usePrivateTransfer() {
           senderEncryptionKey: wallet.encryptionKey,
           senderRailgunAddress: wallet.railgunAddress,
           userAddress: senderAddress,
+          mnemonic,
+          password,
           recipients: apiRecipients,
           permits,
           gasAbstraction,
