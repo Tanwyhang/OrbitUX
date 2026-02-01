@@ -7,9 +7,9 @@ export default function Navigation() {
   const pathname = usePathname()
 
   const tabs = [
+    { name: 'Card', href: '/card' },
     { name: 'Swap', href: '/swap' },
-    { name: 'zkWormhole', href: '/zkWormhole' },
-    { name: 'Card', href: '/card' }
+    { name: 'zkWormhole', href: '/zkWormhole' }
   ]
 
   return (
