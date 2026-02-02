@@ -86,10 +86,10 @@ export default function CardContent() {
               style={{
                 transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
                 transformStyle: 'preserve-3d',
-                width: 'min(386px, 98%)',
-                maxWidth: '350px',
-                height: 'min(243px, calc(386px * 0.63))',
-                aspectRatio: '386/243'
+                width: 'min(450px, 100%)',
+                maxWidth: '420px',
+                height: 'min(284px, calc(450px * 0.63))',
+                aspectRatio: '450/284'
               }}
               onClick={() => setFlipped(!flipped)}
             >
@@ -347,7 +347,7 @@ export default function CardContent() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
-                className="w-full max-w-[400px] h-[97dvh] bg-black rounded-2xl border border-white/20 overflow-hidden pointer-events-auto flex flex-col"
+                className="w-full max-w-[400px] h-dvh bg-black rounded-2xl border border-white/20 overflow-hidden pointer-events-auto flex flex-col"
               >
                 {/* Token List View */}
                 {!selectedToken && !showNfcTap ? (
