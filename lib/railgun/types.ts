@@ -116,6 +116,12 @@ export interface TransferRequest {
   senderRailgunAddress: string; // 0zk... address
   userAddress: string; // User's public wallet address
   
+  // Wallet recreation fields (required for serverless environments)
+  // The mnemonic is needed to recreate the wallet on each request
+  // since serverless functions lose in-memory state between invocations
+  mnemonic: string;
+  password: string;
+  
   // Multi-recipient support
   recipients: TransferRecipientInput[];
   

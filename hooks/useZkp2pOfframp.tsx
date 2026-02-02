@@ -1,7 +1,6 @@
 'use client'
 
 import { useCreateDeposit, useAddFunds, useRemoveFunds, useWithdrawDeposit } from '@zkp2p/sdk/react'
-import type { PublicClient } from 'viem'
 
 export interface IntentAmountRange {
   min: bigint
@@ -20,7 +19,7 @@ export interface CreateDepositParams {
   amount: bigint
   intentAmountRange: IntentAmountRange
   processorNames: string[]
-  depositData: DepositData[]
+  depositData: { [key: string]: string }[]
   conversionRates: ConversionRate[][]
 }
 
@@ -48,10 +47,10 @@ export interface UseZkp2pOfframpReturn {
 /**
  * Hook for ZKP2P offramp functionality
  * Handles creating deposits, adding funds, and withdrawing to fiat via processors like Wise
- * @param client - Viem PublicClient for blockchain interactions
+ * @param client - Zkp2pClient for blockchain interactions
  */
 export function useZkp2pOfframp(
-  client: PublicClient | null
+  client: any
 ): UseZkp2pOfframpReturn {
   // When client is null, return disabled functions
   if (!client) {

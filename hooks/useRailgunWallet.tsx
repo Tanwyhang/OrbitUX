@@ -23,6 +23,7 @@ interface RailgunWalletState {
   status: WalletStatus;
   wallet: RailgunWalletInfo | null;
   mnemonic: string | null;
+  password: string | null;
   error: string | null;
 }
 
@@ -42,6 +43,7 @@ export function RailgunWalletProvider({ children }: { children: ReactNode }): Re
     status: 'none',
     wallet: null,
     mnemonic: null,
+    password: null,
     error: null,
   });
 
@@ -104,6 +106,7 @@ export function RailgunWalletProvider({ children }: { children: ReactNode }): Re
         status: 'ready',
         wallet,
         mnemonic,
+        password,
         error: null,
       });
 
@@ -127,6 +130,7 @@ export function RailgunWalletProvider({ children }: { children: ReactNode }): Re
       status: 'none',
       wallet: null,
       mnemonic: null,
+      password: null,
       error: null,
     });
   }, []);

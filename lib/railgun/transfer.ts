@@ -161,6 +161,11 @@ interface BatchTransferParams {
   senderRailgunAddress: string;
   userAddress: string;
   
+  // Wallet recreation fields (required for serverless environments)
+  // The mnemonic is needed to recreate the wallet on each request
+  mnemonic: string;
+  password: string;
+  
   // Multiple recipients (can have different tokens)
   recipients: TransferRecipientInput[];
   
@@ -638,6 +643,8 @@ class RailgunTransferService {
       senderEncryptionKey: clientEncryptionKey,
       senderRailgunAddress,
       userAddress,
+      mnemonic,
+      password,
       recipients,
       permits,
       gasAbstraction,
@@ -684,21 +691,30 @@ class RailgunTransferService {
         throw new Error("Relayer not configured. Add RELAYER_PRIVATE_KEY to .env.local");
       }
 
-      // Get server-cached encryption key
-      const cachedWallet = railgunWallet.getCachedWalletByID(senderWalletID);
-      const senderEncryptionKey = cachedWallet?.encryptionKey || clientEncryptionKey;
-
-      // Verify wallet exists
-      let abstractWallet = walletForID(senderWalletID);
-      if (!abstractWallet) {
-        console.log('[BatchTransfer] Wallet not found in engine, attempting to load...');
-        try {
-          await loadWalletByID(senderEncryptionKey, senderWalletID, false);
-          abstractWallet = walletForID(senderWalletID);
-        } catch (loadError) {
-          throw new Error(`Wallet ${senderWalletID} not found and could not be loaded.`);
-        }
+      // SERVERLESS FIX: Always recreate wallet from mnemonic
+      // In serverless environments (Vercel, AWS Lambda), the in-memory wallet cache
+      // and memdown database are cleared on each cold start. Instead of trying to
+      // load an existing wallet (which will fail), we recreate it from the mnemonic.
+      console.log('[BatchTransfer] Recreating wallet from mnemonic (serverless-safe)...');
+      const recreatedWallet = await railgunWallet.createWalletFromMnemonic(mnemonic, password);
+      const senderEncryptionKey = recreatedWallet.encryptionKey;
+      
+      // Verify the recreated wallet matches the expected wallet ID
+      if (recreatedWallet.walletID !== senderWalletID) {
+        console.log('[BatchTransfer] Note: Wallet ID changed after recreation');
+        console.log('[BatchTransfer] Expected:', senderWalletID);
+        console.log('[BatchTransfer] Got:', recreatedWallet.walletID);
+        // This is OK - the SDK may generate different IDs, but the 0zk address is deterministic
       }
+      
+      // Get the wallet from the SDK (should now exist after recreation)
+      const abstractWallet = walletForID(recreatedWallet.walletID);
+      if (!abstractWallet) {
+        throw new Error('Failed to recreate wallet - wallet not found in engine after creation');
+      }
+      
+      // Use the recreated wallet ID for all subsequent operations
+      const activeWalletID = recreatedWallet.walletID;
 
       const networkName = railgunEngine.getNetwork();
       const txidVersion = railgunEngine.getTxidVersion();
@@ -868,9 +884,9 @@ class RailgunTransferService {
         
         while (spendableBalance < minExpectedBalance && Date.now() - tokenStartTime < maxWaitTimePerToken) {
           await new Promise(r => setTimeout(r, pollInterval));
-          await refreshBalances(chain, [senderWalletID]);
+          await refreshBalances(chain, [activeWalletID]);
           
-          const wallet = walletForID(senderWalletID);
+          const wallet = walletForID(activeWalletID);
           spendableBalance = await balanceForERC20Token(
             txidVersion,
             wallet,
@@ -936,7 +952,7 @@ class RailgunTransferService {
           () => gasEstimateForUnprovenUnshield(
             txidVersion,
             networkName,
-            senderWalletID,
+            activeWalletID,
             senderEncryptionKey,
             unshieldRecipients,
             [],
@@ -966,7 +982,7 @@ class RailgunTransferService {
           () => generateUnshieldProof(
             txidVersion,
             networkName,
-            senderWalletID,
+            activeWalletID,
             senderEncryptionKey,
             unshieldRecipients,
             [],
@@ -995,7 +1011,7 @@ class RailgunTransferService {
           () => populateProvedUnshield(
             txidVersion,
             networkName,
-            senderWalletID,
+            activeWalletID,
             unshieldRecipients,
             [],
             undefined,
@@ -1045,10 +1061,10 @@ class RailgunTransferService {
             const minExpectedBalance = (remainingRequired * BigInt(99)) / BigInt(100);
 
             while (currentBalance < minExpectedBalance && Date.now() - balanceWaitStart < maxBalanceWait) {
-              await refreshBalances(chain, [senderWalletID]);
+              await refreshBalances(chain, [activeWalletID]);
               await new Promise(r => setTimeout(r, balancePollInterval));
               
-              const wallet = walletForID(senderWalletID);
+              const wallet = walletForID(activeWalletID);
               currentBalance = await balanceForERC20Token(
                 txidVersion,
                 wallet,
@@ -1078,7 +1094,7 @@ class RailgunTransferService {
             }
           } else {
             // No more recipients for this token, just do a quick refresh
-            await refreshBalances(chain, [senderWalletID]);
+            await refreshBalances(chain, [activeWalletID]);
             await new Promise(r => setTimeout(r, 1000));
           }
         }

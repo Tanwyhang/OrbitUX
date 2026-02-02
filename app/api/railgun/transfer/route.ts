@@ -132,12 +132,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     body = await request.json() as TransferRequest;
     
     // Validate core required fields
+    // mnemonic and password are required for serverless wallet recreation
     const coreRequired = [
       'senderWalletID', 
       'senderEncryptionKey', 
       'senderRailgunAddress',
       'userAddress',
-      'gasAbstraction'
+      'gasAbstraction',
+      'mnemonic',
+      'password'
     ];
     const missing = coreRequired.filter(field => !body[field as keyof TransferRequest]);
     
@@ -233,6 +236,8 @@ export async function POST(request: NextRequest): Promise<Response> {
           senderEncryptionKey: body.senderEncryptionKey,
           senderRailgunAddress: body.senderRailgunAddress,
           userAddress: body.userAddress,
+          mnemonic: body.mnemonic,
+          password: body.password,
           recipients,
           permits,
           gasAbstraction: body.gasAbstraction,
